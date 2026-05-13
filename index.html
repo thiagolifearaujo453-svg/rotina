@@ -5,69 +5,55 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Rotina</title>
   <link rel="stylesheet" href="style.css" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="manifest" href="manifest.json" />
 </head>
-<body>
-  <div class="app">
-    <header class="header">
-      <div class="header-top">
-        <div class="logo">
-          <span class="logo-icon">✦</span>
-          <span class="logo-text">rotina</span>
+<body class="dark">
+  <div id="app">
+    <!-- Onboarding -->
+    <div id="screen-onboarding" class="screen active">
+      <div class="onboarding-wrap">
+        <div id="ob-step" class="ob-step"></div>
+        <div class="ob-dots" id="ob-dots"></div>
+        <div class="ob-actions">
+          <button class="btn-ghost" id="ob-back">Voltar</button>
+          <button class="btn-primary" id="ob-next">Próximo</button>
         </div>
-        <div class="date-display" id="dateDisplay"></div>
       </div>
-      <div class="streak-bar">
-        <span class="streak-label">🔥 Sequência</span>
-        <span class="streak-count" id="streakCount">0 dias</span>
+    </div>
+
+    <!-- Main app -->
+    <div id="screen-app" class="screen">
+      <div id="main-content"></div>
+      <nav class="bottom-nav" id="bottom-nav">
+        <button class="nav-btn" data-screen="home" onclick="navigate('home')">
+          <span class="nav-icon">🏠</span><span>Início</span>
+        </button>
+        <button class="nav-btn" data-screen="checklist" onclick="navigate('checklist')">
+          <span class="nav-icon">✅</span><span>Hoje</span>
+        </button>
+        <button class="nav-btn" data-screen="habits" onclick="navigate('habits')">
+          <span class="nav-icon">🔥</span><span>Hábitos</span>
+        </button>
+        <button class="nav-btn" id="btn-mais" onclick="toggleMore()">
+          <span class="nav-icon">☰</span><span>Mais</span>
+        </button>
+      </nav>
+      <div id="more-popup" class="more-popup hidden">
+        <div class="more-grid">
+          <button onclick="navigate('study');toggleMore()" class="more-item">📚<span>Estudos</span></button>
+          <button onclick="navigate('health');toggleMore()" class="more-item">💪<span>Treino</span></button>
+          <button onclick="navigate('mental');toggleMore()" class="more-item">🧠<span>Mental</span></button>
+          <button onclick="navigate('weekly');toggleMore()" class="more-item">📅<span>Semana</span></button>
+          <button onclick="navigate('reports');toggleMore()" class="more-item">📊<span>Relatórios</span></button>
+          <button onclick="navigate('achievements');toggleMore()" class="more-item">🏆<span>Conquistas</span></button>
+          <button onclick="navigate('minimal');toggleMore()" class="more-item">🌱<span>Dia difícil</span></button>
+          <button onclick="navigate('settings');toggleMore()" class="more-item">⚙️<span>Config</span></button>
+        </div>
       </div>
-    </header>
-
-    <main>
-      <section class="progress-section">
-        <div class="progress-header">
-          <div class="progress-title">
-            <h2 id="motivationText">Vamos nessa! 💪</h2>
-            <p id="progressLabel">0 de 0 tarefas concluídas</p>
-          </div>
-          <div class="progress-circle">
-            <svg viewBox="0 0 36 36" class="circular-chart">
-              <path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-              <path class="circle" id="progressCircle" stroke-dasharray="0, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-            </svg>
-            <span class="progress-percent" id="progressPercent">0%</span>
-          </div>
-        </div>
-        <div class="progress-bar-wrap">
-          <div class="progress-bar" id="progressBar" style="width:0%"></div>
-        </div>
-      </section>
-
-      <section class="tasks-section">
-        <div class="tasks-header">
-          <h3>Tarefas do dia</h3>
-          <button class="btn-reset" id="btnReset" title="Reiniciar dia">↺ Novo dia</button>
-        </div>
-
-        <ul class="task-list" id="taskList"></ul>
-
-        <div class="add-task">
-          <input
-            type="text"
-            id="newTaskInput"
-            class="task-input"
-            placeholder="Adicionar nova tarefa..."
-            maxlength="80"
-          />
-          <button class="btn-add" id="btnAdd">+</button>
-        </div>
-      </section>
-    </main>
-
-    <div class="celebration" id="celebration"></div>
+    </div>
   </div>
 
+  <div id="toast-container"></div>
   <script src="app.js"></script>
 </body>
 </html>
