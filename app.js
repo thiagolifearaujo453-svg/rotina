@@ -1,1466 +1,1604 @@
-/* ============================================================
-   ROTINA - Daily Routine Tracker
-   Pure JS, localStorage, Mobile-first
-============================================================ */
+/* =============================================================
+   ROTINA v4 - Daily Routine Tracker
+   Pure JS + localStorage - Mobile First
+============================================================= */
 
-// ========== STATE ==========
+// ============================================================
+// CONSTANTS
+// ============================================================
 const STORAGE_KEY = 'rotina_v3';
-let state = null;
-let currentScreen = 'home';
-let pomodoroInterval = null;
-let pomodoroSeconds = 25 * 60;
-let pomodoroRunning = false;
-let pomodoroMode = 'work'; // work | short | long
+const CATEGORIES = ['Saúde','Trabalho','Estudos','Treino','Alimentação','Mentalidade','Finanças','Organização'];
 
 const QUOTES = [
   'Você não precisa estar motivado. Precisa começar.',
   'Disciplina não é ser perfeito. É voltar rápido quando sai do eixo.',
   'Fecha o TikTok e abre sua vida.',
   'Hoje não precisa vencer o mundo. Só não abandona você mesmo.',
-  'Boa, você não deixou o dia te atropelar.',
   'Cada dia que você se apresenta, mesmo com pouco, é uma vitória.',
   'O segredo é simples: apareça todo dia.',
   'Progresso, não perfeição.',
   'Você já fez coisas difíceis antes. Isso aqui é só mais uma.',
   'Construa hoje a versão de amanhã.',
+  'Pequena vitória hoje. Resultado grande depois.',
+  'Seu futuro não aceita desculpa velha.',
+  'Hoje é dia de fazer o básico bem feito.',
+];
+
+const LEVEL_TITLES = [
+  'Iniciante','Aprendiz','Consistente','Focado','Determinado',
+  'Disciplinado','Inabalável','Elite','Lendário','Imparable'
 ];
 
 const ACHIEVEMENTS = [
-  { id: 'first_day', icon: '🌱', name: 'Primeira Rotina', desc: 'Completou seu primeiro dia', xp: 50 },
-  { id: 'streak_3', icon: '🔥', name: 'Em Chamas', desc: '3 dias seguidos', xp: 75 },
-  { id: 'streak_7', icon: '⚡', name: 'Semana Sólida', desc: '7 dias de streak', xp: 150 },
-  { id: 'streak_30', icon: '💎', name: 'Inabalável', desc: '30 dias de streak', xp: 500 },
-  { id: 'tasks_100', icon: '✅', name: 'Executor', desc: '100 tarefas concluídas', xp: 200 },
-  { id: 'habits_50', icon: '🏆', name: 'Construtor', desc: '50 hábitos marcados', xp: 150 },
-  { id: 'pomodoro_10', icon: '🍅', name: 'Foco Total', desc: '10 pomodoros completos', xp: 100 },
-  { id: 'mental_7', icon: '🧠', name: 'Autoconsciência', desc: '7 diários mentais', xp: 100 },
-  { id: 'perfect_day', icon: '⭐', name: 'Dia Perfeito', desc: 'Score 100 em um dia', xp: 200 },
-  { id: 'early_bird', icon: '🌅', name: 'Madrugador', desc: 'Acordou antes das 6h', xp: 75 },
-  { id: 'hydrated', icon: '💧', name: 'Bem Hidratado', desc: '8 copos em um dia', xp: 50 },
-  { id: 'level_5', icon: '🚀', name: 'Nível 5', desc: 'Alcançou o nível 5', xp: 250 },
-  { id: 'weekly_plan', icon: '📅', name: 'Planejador', desc: 'Completou plano semanal', xp: 100 },
+  { id: 'first_day',       icon: '🌱', name: 'Primeira Rotina',      desc: 'Completou o primeiro dia',         xp: 50  },
+  { id: 'streak_3',        icon: '🔥', name: 'Em Chamas',            desc: '3 dias seguidos',                  xp: 75  },
+  { id: 'streak_7',        icon: '⚡',  name: 'Semana Sólida',         desc: '7 dias de streak',                 xp: 150 },
+  { id: 'streak_30',       icon: '💎', name: 'Inabalável',           desc: '30 dias de streak',                xp: 500 },
+  { id: 'tasks_100',       icon: '✅',  name: 'Executor',              desc: '100 tarefas concluídas',           xp: 200 },
+  { id: 'habits_50',       icon: '🏆', name: 'Construtor',           desc: '50 hábitos marcados',              xp: 150 },
+  { id: 'pomodoro_10',     icon: '🍅', name: 'Foco Total',           desc: '10 pomodoros completos',           xp: 100 },
+  { id: 'study_10h',       icon: '📚', name: '10 Horas de Estudo',  desc: 'Acumulou 10h estudando',          xp: 200 },
+  { id: 'study_50h',       icon: '🎓', name: 'Cabeça na Matéria',    desc: 'Acumulou 50h estudando',          xp: 500 },
+  { id: 'water_7',         icon: '💧', name: 'Hidratado',            desc: '7 dias bebendo 8 copos',          xp: 100 },
+  { id: 'workout_10',      icon: '💪', name: '10 Treinos',           desc: 'Completou 10 treinos',            xp: 150 },
+  { id: 'workout_30',      icon: '🦵', name: '30 Treinos',           desc: 'Completou 30 treinos',            xp: 400 },
+  { id: 'minimal_done',    icon: '🌙', name: 'Mesmo Assim',          desc: 'Completou rotina mínima',        xp: 75  },
+  { id: 'perfect_week',    icon: '🚀', name: 'Semana Perfeita',      desc: '7 dias com score acima de 80',    xp: 350 },
+  { id: 'mental_7',        icon: '🧠', name: 'Autoconsciência',      desc: '7 entradas no diário mental',   xp: 150 },
 ];
 
 const DEFAULT_HABITS = [
-  { id: 'h1', emoji: '🌅', name: 'Acordar cedo', category: 'Saúde', importance: 'alta', streak: 0, lastChecked: null, checkedToday: false },
-  { id: 'h2', emoji: '💧', name: 'Beber 2L de água', category: 'Saúde', importance: 'alta', streak: 0, lastChecked: null, checkedToday: false },
-  { id: 'h3', emoji: '💪', name: 'Treinar', category: 'Treino', importance: 'alta', streak: 0, lastChecked: null, checkedToday: false },
-  { id: 'h4', emoji: '📚', name: 'Estudar 2h', category: 'Estudos', importance: 'alta', streak: 0, lastChecked: null, checkedToday: false },
-  { id: 'h5', emoji: '📖', name: 'Ler 10 páginas', category: 'Leitura', importance: 'media', streak: 0, lastChecked: null, checkedToday: false },
-  { id: 'h6', emoji: '🌙', name: 'Dormir antes de meia-noite', category: 'Saúde', importance: 'alta', streak: 0, lastChecked: null, checkedToday: false },
-  { id: 'h7', emoji: '🏠', name: 'Organizar o quarto', category: 'Organização', importance: 'media', streak: 0, lastChecked: null, checkedToday: false },
-  { id: 'h8', emoji: '💰', name: 'Controlar gastos', category: 'Finanças', importance: 'media', streak: 0, lastChecked: null, checkedToday: false },
+  { id: 1, emoji: '🌅', name: 'Acordar cedo',              category: 'Saúde',       importance: 'alta',  streak: 0, history: [] },
+  { id: 2, emoji: '💧', name: 'Beber 2L de água',          category: 'Saúde',       importance: 'alta',  streak: 0, history: [] },
+  { id: 3, emoji: '💪', name: 'Treinar',                   category: 'Treino',      importance: 'alta',  streak: 0, history: [] },
+  { id: 4, emoji: '📚', name: 'Estudar 2h',                category: 'Estudos',     importance: 'alta',  streak: 0, history: [] },
+  { id: 5, emoji: '📖', name: 'Ler 10 páginas',             category: 'Mentalidade', importance: 'média', streak: 0, history: [] },
+  { id: 6, emoji: '🌙', name: 'Dormir antes de meia-noite', category: 'Saúde',       importance: 'alta',  streak: 0, history: [] },
+  { id: 7, emoji: '🏠', name: 'Organizar o quarto',         category: 'Organização', importance: 'baixa', streak: 0, history: [] },
+  { id: 8, emoji: '💰', name: 'Controlar gastos',           category: 'Finanças',    importance: 'média', streak: 0, history: [] },
 ];
 
 const DEFAULT_TASKS = [
-  { id: 't1', name: 'Tomar água ao acordar', category: 'Saúde', status: 'pending' },
-  { id: 't2', name: 'Fazer 30min de exercício', category: 'Treino', status: 'pending' },
-  { id: 't3', name: 'Estudar por 1 hora', category: 'Estudos', status: 'pending' },
-  { id: 't4', name: 'Meditar 10 minutos', category: 'Mentalidade', status: 'pending' },
-  { id: 't5', name: 'Organizar mesa de trabalho', category: 'Organização', status: 'pending' },
+  { id: 1, name: 'Beber água ao acordar',  category: 'Saúde',       status: 'pending' },
+  { id: 2, name: 'Fazer exercícios',        category: 'Treino',      status: 'pending' },
+  { id: 3, name: 'Estudar por 1 hora',      category: 'Estudos',     status: 'pending' },
+  { id: 4, name: 'Ler por 20 minutos',      category: 'Mentalidade', status: 'pending' },
+  { id: 5, name: 'Planejar o dia',           category: 'Organização', status: 'pending' },
 ];
 
-// ========== INIT ==========
-function init() {
-  loadState();
-  const today = getTodayStr();
-  if (!state.lastDay || state.lastDay !== today) {
-    handleNewDay(today);
-  }
-  if (!state.onboardingDone) {
-    showOnboarding();
-  } else {
-    showApp();
-    navigate('home');
-  }
-}
+const MINIMAL_TASKS = [
+  { id: 'm1', icon: '💧', name: 'Tomar água' },
+  { id: 'm2', icon: '🚿', name: 'Tomar banho' },
+  { id: 'm3', icon: '🛏', name: 'Arrumar a cama' },
+  { id: 'm4', icon: '🍽', name: 'Comer algo decente' },
+  { id: 'm5', icon: '🚶', name: 'Caminhar 10 minutos' },
+  { id: 'm6', icon: '📖', name: 'Estudar 15 minutos' },
+  { id: 'm7', icon: '🌙', name: 'Dormir mais cedo hoje' },
+  { id: 'm8', icon: '💬', name: 'Falar com alguém de confiança' },
+];
+
+// ============================================================
+// STATE
+// ============================================================
+let state = null;
+let currentScreen = 'home';
+let pomodoroInterval = null;
+let pomodoroSeconds = 25 * 60;
+let pomodoroRunning = false;
+let pomodoroMode = 'work';
+let dailyQuoteIdx = new Date().getDate() % QUOTES.length;
 
 function defaultState() {
   return {
-    onboardingDone: false,
-    profile: { name: '', age: '', goals: [], wakeTime: '07:00', sleepTime: '23:00', works: false, studies: false, trains: false, habitsToImprove: [], disciplineLevel: 5 },
+    profile: null,
+    today: getDateStr(),
+    days: {},
     habits: JSON.parse(JSON.stringify(DEFAULT_HABITS)),
-    tasks: JSON.parse(JSON.stringify(DEFAULT_TASKS)),
-    lastDay: null,
-    streak: 0,
+    weeklyPlan: {},
     xp: 0,
-    totalXp: 0,
+    level: 1,
+    streak: 0,
+    bestStreak: 0,
     achievements: [],
-    history: {},
-    study: { totalToday: 0, sessions: [], pomodorosTotal: 0 },
-    health: { waterGlasses: 0, workout: false, workoutType: '', sleepHours: 7, weight: '', energyLevel: 0 },
-    mental: { mood: '', anxiety: 5, energy: 5, goodThing: '', worry: '', improvement: '' },
-    weekly: { focus: '', blockers: '', habitToStrengthen: '', goals: '', toAvoid: '' },
-    minimal: { tasks: [false,false,false,false,false,false,false] },
-    theme: 'dark',
-    totalTasksDone: 0,
-    totalHabitsDone: 0,
+    totalTasks: 0,
+    totalHabits: 0,
     totalPomodoros: 0,
-    totalMentalDiaries: 0,
+    mentalEntries: 0,
+    settings: { theme: 'dark', notifications: true },
+    nextTaskId: 10,
+    nextHabitId: 10,
   };
 }
 
+function defaultDay() {
+  return {
+    tasks: JSON.parse(JSON.stringify(DEFAULT_TASKS)),
+    habitsChecked: {},
+    study: { sessions: [], totalMinutes: 0 },
+    health: { water: 0, workout: null, workoutType: '', sleep: 0, weight: 0, energy: 3 },
+    mental: { mood: null, anxiety: 0, energy: 3, goodThing: '', worry: '', improvement: '', blocker: '', minAction: '' },
+    minimalChecked: {},
+    minimalDone: false,
+    score: 0,
+  };
+}
+
+function getDay(dateStr) {
+  if (!state.days[dateStr]) state.days[dateStr] = defaultDay();
+  return state.days[dateStr];
+}
+
+function today() { return getDay(state.today); }
+
+// ============================================================
+// PERSISTENCE
+// ============================================================
 function loadState() {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
-      state = { ...defaultState(), ...JSON.parse(saved) };
+      state = JSON.parse(saved);
+      handleDateRollover();
     } else {
       state = defaultState();
     }
   } catch(e) {
     state = defaultState();
   }
-  applyTheme();
 }
 
-function saveState() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+function save() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(e) {}
 }
 
-function getTodayStr() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function handleNewDay(today) {
-  if (state.lastDay) {
-    // Save yesterday's score
-    const score = calcDisciplineScore();
-    state.history[state.lastDay] = {
-      score,
-      tasksCompleted: state.tasks.filter(t => t.status === 'done').length,
-      habitsCompleted: state.habits.filter(h => h.checkedToday).length,
-      studyHours: state.study.totalToday,
-    };
-    // Update streak
-    if (score >= 70) {
-      state.streak += 1;
-    } else {
-      state.streak = 0;
-    }
+function handleDateRollover() {
+  const now = getDateStr();
+  if (state.today === now) return;
+  const prevScore = getDay(state.today).score;
+  if (prevScore >= 60) {
+    state.streak++;
+    if (state.streak > (state.bestStreak || 0)) state.bestStreak = state.streak;
+  } else {
+    state.streak = 0;
   }
-  // Reset daily data
-  state.tasks.forEach(t => { t.status = 'pending'; });
-  state.habits.forEach(h => {
-    if (h.checkedToday && state.lastDay) {
-      h.lastChecked = state.lastDay;
-      h.streak = (h.streak || 0) + 1;
-    } else if (state.lastDay) {
-      const yesterday = state.lastDay;
-      if (h.lastChecked !== yesterday) h.streak = 0;
-    }
-    h.checkedToday = false;
+  state.today = now;
+}
+
+// ============================================================
+// UTILS
+// ============================================================
+function getDateStr(d) {
+  const dt = d || new Date();
+  return dt.toISOString().slice(0, 10);
+}
+
+function offsetDate(n) {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  return getDateStr(d);
+}
+
+function getGreeting() {
+  const h = new Date().getHours();
+  if (h < 12) return 'Bom dia';
+  if (h < 18) return 'Boa tarde';
+  return 'Boa noite';
+}
+
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function calcScore(day) {
+  const tasks = day.tasks || [];
+  if (tasks.length === 0) return 0;
+  let pts = 0;
+  tasks.forEach(t => {
+    if (t.status === 'done') pts += 1;
+    else if (t.status === 'partial') pts += 0.5;
   });
-  state.study = { totalToday: 0, sessions: [], pomodorosTotal: state.study.pomodorosTotal || 0 };
-  state.health = { waterGlasses: 0, workout: false, workoutType: '', sleepHours: 7, weight: state.health.weight || '', energyLevel: 0 };
-  state.mental = { mood: '', anxiety: 5, energy: 5, goodThing: '', worry: '', improvement: '' };
-  state.minimal = { tasks: [false,false,false,false,false,false,false] };
-  state.lastDay = today;
-  saveState();
+  let taskScore = Math.round((pts / tasks.length) * 100);
+  const hDone = Object.values(day.habitsChecked || {}).filter(Boolean).length;
+  const hTotal = state.habits.length;
+  let habitScore = hTotal > 0 ? Math.round((hDone / hTotal) * 100) : 0;
+  return Math.min(100, Math.round(taskScore * 0.65 + habitScore * 0.35));
 }
 
-function calcDisciplineScore() {
-  const tasks = state.tasks;
-  const habits = state.habits;
-  const taskScore = tasks.length ? (tasks.filter(t => t.status === 'done').length / tasks.length) * 100 : 0;
-  const habitScore = habits.length ? (habits.filter(h => h.checkedToday).length / habits.length) * 100 : 0;
-  return Math.round(taskScore * 0.7 + habitScore * 0.3);
+function getScoreColor(s) {
+  if (s >= 80) return 'var(--green)';
+  if (s >= 50) return 'var(--accent2)';
+  if (s >= 25) return 'var(--orange)';
+  return 'var(--red)';
 }
 
-function getXpLevel() {
-  const xp = state.totalXp || 0;
-  const level = Math.floor(xp / 200) + 1;
-  const xpInLevel = xp % 200;
-  const xpToNext = 200;
-  return { level, xp, xpInLevel, xpToNext };
+function getScoreStatus(s) {
+  if (s >= 90) return 'Você dominou o dia. Isso é raro.';
+  if (s >= 75) return 'Hoje você está no controle.';
+  if (s >= 50) return 'Na metade do caminho. Não para agora.';
+  if (s >= 25) return 'Ainda dá tempo de virar o jogo.';
+  if (s > 0)  return 'Começou. O resto é uma questão de escolha.';
+  return 'O dia é seu. Qual é o primeiro passo?';
 }
 
-function addXp(amount) {
-  state.xp = (state.xp || 0) + amount;
-  state.totalXp = (state.totalXp || 0) + amount;
-  checkAchievements();
-  saveState();
+function getMotivation(score) {
+  if (score === 100) return 'Missão cumprida. Você não é mais a mesma pessoa de ontem.';
+  if (score >= 80) return 'Boa. Você manteve o controle.';
+  if (score >= 60) return 'Ainda falta pouco. Não larga agora.';
+  if (score >= 40) return 'Hoje foi meio baçunado, mas amanhã dá pra ajustar.';
+  if (score >= 20) return 'Dia difícil também conta quando você não desiste.';
+  return 'Começa pelo menor passo. Um copo de água já é algo.';
+}
+
+function getLevelTitle(level) {
+  return LEVEL_TITLES[Math.min(level - 1, LEVEL_TITLES.length - 1)];
+}
+
+function xpForNextLevel(level) { return level * 150 + 100; }
+
+// ============================================================
+// XP & ACHIEVEMENTS
+// ============================================================
+function addXP(amount, label) {
+  state.xp += amount;
+  const needed = xpForNextLevel(state.level);
+  if (state.xp >= needed) {
+    state.xp -= needed;
+    state.level++;
+    showToast('🔝 Nível ' + state.level + '! ' + getLevelTitle(state.level), 'xp');
+  }
+  showXPFlash('+' + amount + ' XP' + (label ? ' — ' + label : ''));
+  save();
+}
+
+function showXPFlash(text) {
+  const el = document.getElementById('xp-flash');
+  if (!el) return;
+  el.textContent = text;
+  el.classList.remove('hidden', 'show');
+  void el.offsetWidth;
+  el.classList.add('show');
+  setTimeout(() => { el.classList.remove('show'); el.classList.add('hidden'); }, 800);
 }
 
 function checkAchievements() {
-  ACHIEVEMENTS.forEach(ach => {
-    if (state.achievements.includes(ach.id)) return;
-    let unlock = false;
-    if (ach.id === 'first_day' && Object.keys(state.history).length >= 1) unlock = true;
-    if (ach.id === 'streak_3' && state.streak >= 3) unlock = true;
-    if (ach.id === 'streak_7' && state.streak >= 7) unlock = true;
-    if (ach.id === 'streak_30' && state.streak >= 30) unlock = true;
-    if (ach.id === 'tasks_100' && (state.totalTasksDone || 0) >= 100) unlock = true;
-    if (ach.id === 'habits_50' && (state.totalHabitsDone || 0) >= 50) unlock = true;
-    if (ach.id === 'pomodoro_10' && (state.totalPomodoros || 0) >= 10) unlock = true;
-    if (ach.id === 'mental_7' && (state.totalMentalDiaries || 0) >= 7) unlock = true;
-    if (ach.id === 'perfect_day' && calcDisciplineScore() === 100) unlock = true;
-    if (ach.id === 'hydrated' && state.health.waterGlasses >= 8) unlock = true;
-    if (ach.id === 'level_5' && getXpLevel().level >= 5) unlock = true;
-    if (ach.id === 'weekly_plan' && state.weekly.goals && state.weekly.goals.length > 5) unlock = true;
-    if (unlock) {
-      state.achievements.push(ach.id);
-      state.totalXp += ach.xp;
-      showToast(`🏆 Conquista desbloqueada: ${ach.name}!`, 'success');
+  const day = today();
+  const score = calcScore(day);
+  const totalStudyMin = Object.values(state.days).reduce((s, d) => s + (d.study?.totalMinutes || 0), 0);
+  const totalWorkouts = Object.values(state.days).filter(d => d.health?.workout === true).length;
+  const water7 = Array.from({length:7},(_,i) => offsetDate(-i)).every(d => (state.days[d]?.health?.water || 0) >= 8);
+  const checks = [
+    { id: 'first_day',    cond: () => score > 0 },
+    { id: 'streak_3',     cond: () => state.streak >= 3 },
+    { id: 'streak_7',     cond: () => state.streak >= 7 },
+    { id: 'streak_30',    cond: () => state.streak >= 30 },
+    { id: 'tasks_100',    cond: () => state.totalTasks >= 100 },
+    { id: 'habits_50',    cond: () => state.totalHabits >= 50 },
+    { id: 'pomodoro_10',  cond: () => state.totalPomodoros >= 10 },
+    { id: 'study_10h',    cond: () => totalStudyMin >= 600 },
+    { id: 'study_50h',    cond: () => totalStudyMin >= 3000 },
+    { id: 'water_7',      cond: () => water7 },
+    { id: 'workout_10',   cond: () => totalWorkouts >= 10 },
+    { id: 'workout_30',   cond: () => totalWorkouts >= 30 },
+    { id: 'minimal_done', cond: () => day.minimalDone },
+    { id: 'mental_7',     cond: () => state.mentalEntries >= 7 },
+    { id: 'perfect_week', cond: () => Array.from({length:7},(_,i) => offsetDate(-i)).every(d => (state.days[d]?.score||0) >= 80) },
+  ];
+  checks.forEach(({ id, cond }) => {
+    if (!state.achievements.includes(id) && cond()) {
+      state.achievements.push(id);
+      const def = ACHIEVEMENTS.find(a => a.id === id);
+      if (def) {
+        state.xp += def.xp;
+        showToast(def.icon + ' Conquista: ' + def.name + ' (+' + def.xp + ' XP)!', 'xp');
+      }
     }
   });
+  save();
 }
 
-function getSuggestion() {
-  const h = state.health;
-  const habits = state.habits;
-  const tasks = state.tasks;
-  if (h.sleepHours < 6) return 'Você dormiu pouco hoje. Priorize o sono — sem ele, tudo fica mais difícil.';
-  if (state.mental.anxiety >= 7) return 'Ansiedade elevada detectada. Respira fundo. 5 minutos de caminhada ajudam muito.';
-  const pendingTasks = tasks.filter(t => t.status === 'pending').length;
-  if (pendingTasks >= tasks.length && tasks.length > 0) return `Você tem ${pendingTasks} tarefas pendentes. Comece pela mais fácil — o movimento gera energia.`;
-  const history = state.history;
-  const days = Object.keys(history).sort().slice(-3);
-  const noStudy = days.every(d => !history[d].studyHours || history[d].studyHours === 0);
-  if (noStudy && days.length >= 2) return 'Você não está estudando há alguns dias. Que tal 25 minutos de pomodoro agora?';
-  const noWorkout = days.every(d => {
-    const habit = state.habits.find(h2 => h2.name.toLowerCase().includes('treinar'));
-    return habit ? !habit.checkedToday : true;
-  });
-  if (noWorkout && days.length >= 2) return 'Treino em falta! Movimento é remédio. Qualquer coisa conta — até 20 minutos de caminhada.';
-  return 'Continue firme. Cada ação pequena constrói quem você quer ser.';
+// ============================================================
+// SMART SUGGESTIONS
+// ============================================================
+function getSmartSuggestion() {
+  const day = today();
+  const m = day.mental;
+  const h = day.health;
+  const score = calcScore(day);
+  const pending = day.tasks.filter(t => t.status === 'pending').length;
+
+  if (h.sleep > 0 && h.sleep < 5.5)
+    return { icon: '😴', type: 'warning', text: 'Você dormiu pouco. Hoje não inventa moda. Faz o básico bem feito e dorme mais cedo.' };
+
+  if (m.mood && (m.mood === '😣' || m.mood === '😔') && m.anxiety >= 6)
+    return { icon: '🧠', type: 'danger', text: 'Humor baixo e ansiedade alta. Reduz a meta: água, banho, caminhada curta e 25 minutos de foco. Isso já é vencer.' };
+
+  if (m.anxiety >= 7)
+    return { icon: '💨', type: 'danger', text: 'Ansiedade alta hoje. Para 5 minutos, respira fundo e anota o que tá te pesando. Depois volta pra rotina.' };
+
+  if (m.energy === 1 || m.energy === 2)
+    return { icon: '⚡', type: 'warning', text: 'Energia baixa. Comece pela tarefa mais simples. Movimento gera movimento, mesmo que pequeno.' };
+
+  const noWorkout3 = [offsetDate(-1), offsetDate(-2), offsetDate(-3)].every(d => !state.days[d]?.health?.workout);
+  if (noWorkout3 && !h.workout)
+    return { icon: '🏋', type: 'warning', text: 'Você não treinou nos últimos 3 dias. Faz 20 minutos hoje, só pra não quebrar o ritmo.' };
+
+  const noStudy2 = [offsetDate(-1), offsetDate(-2)].every(d => !(state.days[d]?.study?.totalMinutes > 0));
+  if (noStudy2)
+    return { icon: '📚', type: 'warning', text: 'Você não estudou nos últimos 2 dias. Começa com um bloco de 25 minutos. Sem drama, só abre o material.' };
+
+  if (h.water === 0)
+    return { icon: '💧', type: 'info', text: 'Você ainda não bebeu água hoje. Vai lá, um copo agora. Isso leva 10 segundos.' };
+
+  if (pending >= 6)
+    return { icon: '🎯', type: 'warning', text: 'Muitas tarefas pendentes. Escolha só 3 essenciais. O resto é bônus.' };
+
+  if (score >= 80)
+    return { icon: '🔥', type: 'success', text: 'Você está construindo ritmo. Protége esse momento. Não quebra a sequência.' };
+
+  if (state.streak >= 7)
+    return { icon: '💪', type: 'success', text: state.streak + ' dias no eixo. Isso não é sorte, é construção. Continua.' };
+
+  return { icon: '💡', type: 'info', text: 'Fecha o TikTok e abre sua vida. Você tem o que precisa pra ter um bom dia.' };
 }
 
-// ========== THEME ==========
-function applyTheme() {
-  document.body.className = state.theme || 'dark';
+// ============================================================
+// TOAST
+// ============================================================
+function showToast(msg, type) {
+  const c = document.getElementById('toast-container');
+  if (!c) return;
+  const t = document.createElement('div');
+  t.className = 'toast' + (type ? ' ' + type : '');
+  t.textContent = msg;
+  c.appendChild(t);
+  setTimeout(() => t.remove(), 3500);
 }
 
-function toggleTheme() {
-  state.theme = state.theme === 'dark' ? 'light' : 'dark';
-  applyTheme();
-  saveState();
-  navigate('settings');
-}
-
-// ========== NAVIGATION ==========
-function showOnboarding() {
-  document.getElementById('screen-onboarding').classList.add('active');
-  document.getElementById('screen-app').classList.remove('active');
-  renderOnboarding(0);
-}
-
-function showApp() {
-  document.getElementById('screen-onboarding').classList.remove('active');
-  document.getElementById('screen-app').classList.add('active');
-}
-
+// ============================================================
+// NAVIGATION
+// ============================================================
 function navigate(screen) {
   currentScreen = screen;
-  // Update nav buttons
-  document.querySelectorAll('.nav-btn[data-screen]').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.screen === screen);
+  document.querySelectorAll('.nav-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.screen === screen);
   });
-  const content = document.getElementById('main-content');
-  content.innerHTML = '';
-  const renders = {
-    home: renderHome,
-    checklist: renderChecklist,
-    habits: renderHabits,
-    study: renderStudy,
-    health: renderHealth,
-    mental: renderMental,
-    reports: renderReports,
-    achievements: renderAchievements,
-    minimal: renderMinimal,
-    weekly: renderWeekly,
-    settings: renderSettings,
-  };
-  if (renders[screen]) renders[screen](content);
-  // Scroll to top
-  content.scrollTo && content.scrollTo(0, 0);
-  window.scrollTo(0, 0);
+  renderScreen(screen);
 }
 
 function toggleMore() {
   const popup = document.getElementById('more-popup');
-  popup.classList.toggle('hidden');
+  const overlay = document.getElementById('more-overlay');
+  if (!popup) return;
+  const hidden = popup.classList.contains('hidden');
+  popup.classList.toggle('hidden', !hidden);
+  overlay.classList.toggle('hidden', !hidden);
 }
 
-// Close more popup when clicking outside
-document.addEventListener('click', e => {
-  const popup = document.getElementById('more-popup');
-  const btn = document.getElementById('btn-mais');
-  if (!popup || !btn) return;
-  if (!popup.contains(e.target) && !btn.contains(e.target)) {
-    popup.classList.add('hidden');
+function renderScreen(screen) {
+  const renders = {
+    home: renderHome, checklist: renderChecklist, habits: renderHabits,
+    study: renderStudy, health: renderHealth, mental: renderMental,
+    reports: renderReports, achievements: renderAchievements,
+    minimal: renderMinimal, weekly: renderWeekly, settings: renderSettings,
+  };
+  if (renders[screen]) {
+    today().score = calcScore(today());
+    save();
+    renders[screen]();
   }
-});
-
-// ========== TOAST ==========
-function showToast(msg, type = 'info', duration = 3000) {
-  const container = document.getElementById('toast-container');
-  const toast = document.createElement('div');
-  toast.className = `toast ${type}`;
-  toast.innerHTML = `<span>${msg}</span>`;
-  container.appendChild(toast);
-  setTimeout(() => toast.remove(), duration);
 }
 
-// ========== ONBOARDING ==========
+function setContent(html) {
+  const el = document.getElementById('main-content');
+  if (el) { el.innerHTML = html; el.scrollTo(0, 0); }
+}
+
+// ============================================================
+// ONBOARDING
+// ============================================================
+const OB_STEPS = [
+  {
+    emoji: '✦',
+    title: 'Sua rotina.\nSeus resultados.',
+    sub: 'Um app feito pra te ajudar a construir disciplina de verdade.\nNão é sobre ser perfeito. É sobre não parar.',
+    type: 'welcome'
+  },
+  {
+    emoji: '👤',
+    title: 'Como te chamamos?',
+    sub: 'Personaliza a experiência pra você.',
+    type: 'name',
+    field: { label: 'Seu nome', id: 'ob-name', placeholder: 'Ex: Rafael', type: 'text' }
+  },
+  {
+    emoji: '🎯',
+    title: 'Qual é seu foco?',
+    sub: 'Selecione tudo que faz sentido pra você agora.',
+    type: 'chips',
+    key: 'goals',
+    chips: ['Passar em concurso','Crescer no trabalho','Melhorar o corpo','Estudar mais','Organizar a vida','Ganhar dinheiro','Reduzir ansiedade','Criar disciplina']
+  },
+  {
+    emoji: '⏰',
+    title: 'Qual a sua rotina?',
+    sub: 'Isso ajuda a criar sugestões certeiras.',
+    type: 'schedule'
+  },
+  {
+    emoji: '🙋',
+    title: 'O que quer melhorar?',
+    sub: 'Marque seus hábitos-alvo.',
+    type: 'chips',
+    key: 'habitTargets',
+    chips: ['Água','Sono','Exercício','Alimentação','Estudo','Leitura','Organização','Finanças','Foco','Ansiedade']
+  },
+  {
+    emoji: '📊',
+    title: 'Seu nível de disciplina hoje?',
+    sub: 'Seja honesto. Isso é só pra calibrar.',
+    type: 'slider',
+    key: 'disciplineLevel'
+  },
+];
+
 let obStep = 0;
 let obData = {};
 
-function renderOnboarding(step) {
-  obStep = step;
-  const stepEl = document.getElementById('ob-step');
-  const dotsEl = document.getElementById('ob-dots');
-  const backBtn = document.getElementById('ob-back');
-  const nextBtn = document.getElementById('ob-next');
-
-  // Dots
-  dotsEl.innerHTML = '';
-  for (let i = 0; i < 6; i++) {
-    const dot = document.createElement('div');
-    dot.className = `ob-dot${i === step ? ' active' : ''}`;
-    dotsEl.appendChild(dot);
-  }
-
-  backBtn.style.display = step === 0 ? 'none' : 'block';
-  nextBtn.textContent = step === 5 ? 'Começar 🚀' : 'Próximo';
-
-  const steps = [
-    () => `
-      <div class="ob-emoji">✨</div>
-      <h1 class="ob-title">Bem-vindo ao Rotina</h1>
-      <p class="ob-sub">Seu companheiro de disciplina diária.<br>Vamos construir hábitos que transformam.</p>
-    `,
-    () => `
-      <h2 class="ob-title" style="font-size:22px">Quem é você?</h2>
-      <p class="ob-sub">Nos conte um pouco sobre você</p>
-      <div class="form-group">
-        <label class="form-label">Seu nome</label>
-        <input class="form-input" id="ob-name" type="text" placeholder="Ex: João" value="${obData.name || ''}" />
-      </div>
-      <div class="form-group">
-        <label class="form-label">Sua idade</label>
-        <input class="form-input" id="ob-age" type="number" placeholder="Ex: 22" min="13" max="60" value="${obData.age || ''}" />
-      </div>
-    `,
-    () => `
-      <h2 class="ob-title" style="font-size:22px">Seus objetivos</h2>
-      <p class="ob-sub">O que você quer melhorar? (Selecione todos)</p>
-      <div class="chip-wrap" id="ob-goals">
-        ${['Produtividade','Saúde','Finanças','Estudos','Esportes','Mindfulness','Sono','Social'].map(g =>
-          `<div class="chip${(obData.goals||[]).includes(g)?' selected':''}" onclick="toggleChip(this,'${g}','goals')">${g}</div>`
-        ).join('')}
-      </div>
-    `,
-    () => `
-      <h2 class="ob-title" style="font-size:22px">Sua rotina</h2>
-      <p class="ob-sub">Ajuste o app à sua realidade</p>
-      <div class="form-group">
-        <label class="form-label">Horário de acordar</label>
-        <input class="form-input" id="ob-wake" type="time" value="${obData.wakeTime || '07:00'}" />
-      </div>
-      <div class="form-group">
-        <label class="form-label">Horário de dormir</label>
-        <input class="form-input" id="ob-sleep" type="time" value="${obData.sleepTime || '23:00'}" />
-      </div>
-      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">
-        ${['Trabalha','Estuda','Treina'].map((item, i) => {
-          const keys = ['works','studies','trains'];
-          return `<div class="chip${obData[keys[i]]?' selected':''}" onclick="toggleBool(this,'${keys[i]}')">${item}</div>`;
-        }).join('')}
-      </div>
-    `,
-    () => `
-      <h2 class="ob-title" style="font-size:22px">Hábitos para melhorar</h2>
-      <p class="ob-sub">Quais hábitos você quer trabalhar?</p>
-      <div class="chip-wrap" id="ob-habits">
-        ${['Acordar cedo','Beber água','Fazer exercício','Estudar mais','Dormir bem','Organização','Menos celular','Leitura','Meditação'].map(h =>
-          `<div class="chip${(obData.habitsToImprove||[]).includes(h)?' selected':''}" onclick="toggleChip(this,'${h}','habitsToImprove')">${h}</div>`
-        ).join('')}
-      </div>
-    `,
-    () => `
-      <h2 class="ob-title" style="font-size:22px">Nível de disciplina</h2>
-      <p class="ob-sub">Como você se avalia hoje?</p>
-      <div style="text-align:center;margin:20px 0">
-        <span style="font-size:56px;font-weight:900;color:var(--accent)" id="ob-disc-val">${obData.disciplineLevel || 5}</span>
-        <span style="font-size:20px;color:var(--text2)">/10</span>
-      </div>
-      <input type="range" class="range-input" id="ob-disc" min="1" max="10" value="${obData.disciplineLevel || 5}"
-        oninput="document.getElementById('ob-disc-val').textContent=this.value" />
-      <div style="display:flex;justify-content:space-between;margin-top:6px">
-        <span style="font-size:12px;color:var(--text3)">Precisando de ajuda</span>
-        <span style="font-size:12px;color:var(--text3)">Muito disciplinado</span>
-      </div>
-      <p style="text-align:center;color:var(--text2);font-size:14px;margin-top:20px">Sem julgamentos. Queremos te ajudar a partir de onde você está.</p>
-    `,
-  ];
-
-  stepEl.innerHTML = steps[step]();
-
-  // Re-attach listeners
-  backBtn.onclick = () => renderOnboarding(Math.max(0, step - 1));
-  nextBtn.onclick = () => obNext(step);
+function initOnboarding() {
+  obStep = 0;
+  obData = { goals: [], habitTargets: [], wakeTime: '06:00', sleepTime: '23:00', disciplineLevel: 5 };
+  renderObStep();
+  document.getElementById('ob-back').onclick = obBack;
+  document.getElementById('ob-next').onclick = obNext;
 }
 
-function toggleChip(el, val, key) {
+function renderObStep() {
+  const step = OB_STEPS[obStep];
+  const dots = OB_STEPS.map((_, i) => `<div class="ob-dot${i < obStep ? ' done' : i === obStep ? ' active' : ''}"></div>`).join('');
+  document.getElementById('ob-dots').innerHTML = dots;
+
+  const backBtn = document.getElementById('ob-back');
+  const nextBtn = document.getElementById('ob-next');
+  backBtn.style.display = obStep === 0 ? 'none' : '';
+  nextBtn.textContent = obStep === OB_STEPS.length - 1 ? 'Começar minha rotina →' : 'Próximo';
+
+  let body = '';
+  if (step.type === 'welcome') {
+    body = `<div class="ob-emoji" style="font-size:72px;color:var(--accent2);font-weight:900">${step.emoji}</div>
+      <h1 class="ob-title" style="white-space:pre-line">${step.title}</h1>
+      <p class="ob-sub">${step.sub}</p>`;
+  } else if (step.type === 'name') {
+    body = `<div class="ob-emoji">${step.emoji}</div>
+      <h1 class="ob-title">${step.title}</h1>
+      <p class="ob-sub">${step.sub}</p>
+      <div class="form-group">
+        <label class="form-label">${step.field.label}</label>
+        <input class="form-input" id="${step.field.id}" placeholder="${step.field.placeholder}" type="${step.field.type}" value="${esc(obData.name||'')}" />
+      </div>`;
+  } else if (step.type === 'chips') {
+    const selected = obData[step.key] || [];
+    const chips = step.chips.map(c =>
+      `<span class="chip${selected.includes(c) ? ' selected' : ''}" onclick="obToggleChip('${step.key}','${c}',this)">${c}</span>`
+    ).join('');
+    body = `<div class="ob-emoji">${step.emoji}</div>
+      <h1 class="ob-title">${step.title}</h1>
+      <p class="ob-sub">${step.sub}</p>
+      <div class="chip-wrap">${chips}</div>`;
+  } else if (step.type === 'schedule') {
+    body = `<div class="ob-emoji">${step.emoji}</div>
+      <h1 class="ob-title">${step.title}</h1>
+      <p class="ob-sub">${step.sub}</p>
+      <div class="form-group">
+        <label class="form-label">Acordo às</label>
+        <input class="form-input" id="ob-wake" type="time" value="${obData.wakeTime}" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Durmo às</label>
+        <input class="form-input" id="ob-sleep" type="time" value="${obData.sleepTime}" />
+      </div>
+      <div class="chip-wrap">
+        ${['Trabalho','Estudo','Treino'].map(a =>
+          `<span class="chip${(obData.activities||[]).includes(a)?' selected':''}" onclick="obToggleChip('activities','${a}',this)">${a}</span>`
+        ).join('')}
+      </div>`;
+  } else if (step.type === 'slider') {
+    body = `<div class="ob-emoji">${step.emoji}</div>
+      <h1 class="ob-title">${step.title}</h1>
+      <p class="ob-sub">${step.sub}</p>
+      <div style="text-align:center;font-size:64px;font-weight:900;color:var(--accent2);margin:16px 0" id="ob-dis-val">${obData.disciplineLevel}</div>
+      <input class="range-input" type="range" min="1" max="10" value="${obData.disciplineLevel}"
+        oninput="obData.disciplineLevel=+this.value;document.getElementById('ob-dis-val').textContent=this.value" />
+      <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text3);margin-top:8px">
+        <span>Iniciante</span><span>Moderado</span><span>Avançado</span>
+      </div>`;
+  }
+  document.getElementById('ob-step').innerHTML = body;
+}
+
+function obToggleChip(key, val, el) {
   if (!obData[key]) obData[key] = [];
   const idx = obData[key].indexOf(val);
   if (idx >= 0) { obData[key].splice(idx, 1); el.classList.remove('selected'); }
   else { obData[key].push(val); el.classList.add('selected'); }
 }
 
-function toggleBool(el, key) {
-  obData[key] = !obData[key];
-  el.classList.toggle('selected', obData[key]);
+function obBack() {
+  if (obStep > 0) { obStep--; renderObStep(); }
 }
 
-function obNext(step) {
-  if (step === 1) {
-    obData.name = document.getElementById('ob-name')?.value.trim() || '';
-    obData.age = document.getElementById('ob-age')?.value || '';
-    if (!obData.name) { showToast('Digite seu nome!', 'error'); return; }
+function obNext() {
+  const step = OB_STEPS[obStep];
+  if (step.type === 'name') {
+    const v = document.getElementById('ob-name')?.value?.trim();
+    if (!v) { showToast('Coloca seu nome aí!', 'error'); return; }
+    obData.name = v;
   }
-  if (step === 3) {
-    obData.wakeTime = document.getElementById('ob-wake')?.value || '07:00';
+  if (step.type === 'schedule') {
+    obData.wakeTime = document.getElementById('ob-wake')?.value || '06:00';
     obData.sleepTime = document.getElementById('ob-sleep')?.value || '23:00';
   }
-  if (step === 5) {
-    obData.disciplineLevel = parseInt(document.getElementById('ob-disc')?.value || '5');
-    // Save to state
-    state.profile = { ...state.profile, ...obData };
-    state.onboardingDone = true;
-    saveState();
-    showApp();
-    navigate('home');
-    showToast(`Bem-vindo, ${state.profile.name}! Vamos começar. 🚀`, 'success');
-    return;
+  if (obStep < OB_STEPS.length - 1) {
+    obStep++;
+    renderObStep();
+  } else {
+    finishOnboarding();
   }
-  renderOnboarding(step + 1);
 }
 
-// ========== HOME ==========
-function renderHome(container) {
-  const score = calcDisciplineScore();
-  const name = state.profile.name || 'Você';
-  const hour = new Date().getHours();
-  const greeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite';
-  const quote = QUOTES[Math.floor(Math.random() * QUOTES.length)];
-  const { level, xpInLevel, xpToNext } = getXpLevel();
-  const suggestion = getSuggestion();
-  const tasks = state.tasks;
-  const habits = state.habits;
-  const tasksDone = tasks.filter(t => t.status === 'done').length;
-  const habitsDone = habits.filter(h => h.checkedToday).length;
+function finishOnboarding() {
+  state.profile = { ...obData, completed: true };
+  state.settings.theme = 'dark';
+  if (obData.name) state.settings.name = obData.name;
+  save();
+  showApp();
+}
 
-  container.innerHTML = `
+function showApp() {
+  document.getElementById('screen-onboarding').classList.remove('active');
+  document.getElementById('screen-app').classList.add('active');
+  document.getElementById('bottom-nav').style.display = 'flex';
+  navigate('home');
+}
+
+// ============================================================
+// HOME
+// ============================================================
+function renderHome() {
+  const day = today();
+  const score = calcScore(day);
+  day.score = score;
+  save();
+
+  const name = state.settings?.name || state.profile?.name || 'você';
+  const done = day.tasks.filter(t => t.status === 'done').length;
+  const total = day.tasks.length;
+  const hDone = Object.values(day.habitsChecked || {}).filter(Boolean).length;
+  const hTotal = state.habits.length;
+  const xpNeeded = xpForNextLevel(state.level);
+  const xpPct = Math.round((state.xp / xpNeeded) * 100);
+  const dateStr = new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
+  const suggestion = getSmartSuggestion();
+  const quote = QUOTES[dailyQuoteIdx];
+  const scoreColor = getScoreColor(score);
+
+  const statsCards = [
+    { icon: '✅', val: done + '/' + total, label: 'Tarefas', pct: total ? Math.round(done/total*100) : 0, screen: 'checklist' },
+    { icon: '🔥', val: hDone + '/' + hTotal, label: 'Hábitos', pct: hTotal ? Math.round(hDone/hTotal*100) : 0, screen: 'habits' },
+    { icon: '💧', val: day.health.water + ' copos', label: 'Água', pct: Math.min(100, Math.round(day.health.water/8*100)), screen: 'health' },
+    { icon: '💪', val: day.health.workout === true ? 'Feito ✓' : day.health.workout === false ? 'Não' : '—', label: 'Treino', pct: day.health.workout === true ? 100 : 0, screen: 'health' },
+    { icon: '📚', val: +(day.study.totalMinutes/60).toFixed(1) + 'h', label: 'Estudo', pct: Math.min(100, Math.round(day.study.totalMinutes/120*100)), screen: 'study' },
+    { icon: day.mental.mood || '😶', val: day.mental.mood || '—', label: 'Humor', pct: 0, screen: 'mental', noBar: true },
+    { icon: '😴', val: day.health.sleep ? day.health.sleep + 'h' : '—', label: 'Sono', pct: day.health.sleep ? Math.min(100, Math.round(day.health.sleep/8*100)) : 0, screen: 'health' },
+    { icon: '📴', val: state.streak + ' dias', label: 'Sequência', pct: Math.min(100, Math.round(state.streak/30*100)), screen: 'achievements', barClass: 'orange' },
+  ];
+
+  const statsHTML = statsCards.map(s =>
+    `<div class="stat-card" onclick="navigate('${s.screen}')">
+      <div class="stat-icon">${s.icon}</div>
+      <div class="stat-value">${s.val}</div>
+      <div class="stat-label">${s.label}</div>
+      ${!s.noBar ? `<div class="stat-bar"><div class="progress-bar-wrap" style="margin:0"><div class="progress-bar-fill${s.barClass?' '+s.barClass:''}" style="width:${s.pct}%"></div></div></div>` : ''}
+    </div>`
+  ).join('');
+
+  setContent(`
     <div class="screen-content">
-      <div class="card greeting-card">
-        <div class="greeting-sub">${greeting},</div>
-        <div class="greeting-name">${name} 👋</div>
-        <div style="display:flex;align-items:flex-end;gap:10px;margin-top:16px">
-          <div>
-            <div style="font-size:12px;color:var(--text2);margin-bottom:2px">Score do dia</div>
-            <div class="discipline-score">${score}</div>
+      <div class="hero-card">
+        <div class="hero-greeting">${getGreeting()}, ${dateStr}</div>
+        <div class="hero-name">${esc(name)}</div>
+        <div class="hero-status">${getScoreStatus(score)}</div>
+        <div class="hero-row">
+          <div class="hero-score-wrap">
+            <div class="hero-score" style="background:linear-gradient(135deg,${scoreColor},var(--accent2));-webkit-background-clip:text;background-clip:text">${score}</div>
+            <div class="hero-score-label">Score do dia</div>
           </div>
-          <div style="flex:1;padding-bottom:10px">
-            <div style="font-size:12px;color:var(--text2);margin-bottom:6px">Nível ${level} • ${xpInLevel}/${xpToNext} XP</div>
-            <div class="xp-bar-wrap"><div class="xp-bar-fill" style="width:${(xpInLevel/xpToNext)*100}%"></div></div>
-            <div style="font-size:12px;color:var(--orange);margin-top:4px">🔥 ${state.streak} dias de streak</div>
+          <div class="hero-stats">
+            <div class="hero-stat-item">
+              <span class="hero-stat-label">🔥 Sequência</span>
+              <span class="hero-stat-val">${state.streak} dias</span>
+            </div>
+            <div class="hero-stat-item">
+              <span class="hero-stat-label">⭐ Nível</span>
+              <span class="hero-stat-val">${state.level} — ${getLevelTitle(state.level)}</span>
+            </div>
+            <div class="hero-stat-item">
+              <span class="hero-stat-label">🔩 XP</span>
+              <span class="hero-stat-val">${state.xp} / ${xpForNextLevel(state.level)}</span>
+            </div>
           </div>
+        </div>
+        <div class="hero-xp-section">
+          <div class="hero-xp-label"><span>XP para o próximo nível</span><span>${xpPct}%</span></div>
+          <div class="progress-bar-wrap" style="height:6px"><div class="progress-bar-fill purple" style="width:${xpPct}%"></div></div>
+        </div>
+        <div class="hero-quote">“${quote}”</div>
+      </div>
+
+      <div class="suggestion-card ${suggestion.type}">
+        <div class="suggestion-icon">${suggestion.icon}</div>
+        <div class="suggestion-body">
+          <div class="suggestion-title">Sugestão do dia</div>
+          <div class="suggestion-text">${suggestion.text}</div>
         </div>
       </div>
 
-      <div class="card suggestion-card">
-        <div class="suggestion-title">💡 Sugestão do dia</div>
-        <div class="suggestion-text">${suggestion}</div>
-      </div>
-
-      <div class="stats-grid">
-        <div class="stat-card">
-          <span class="stat-icon">✅</span>
-          <span class="stat-value">${tasksDone}/${tasks.length}</span>
-          <span class="stat-label">Tarefas hoje</span>
-        </div>
-        <div class="stat-card">
-          <span class="stat-icon">🔥</span>
-          <span class="stat-value">${habitsDone}/${habits.length}</span>
-          <span class="stat-label">Hábitos hoje</span>
-        </div>
-        <div class="stat-card">
-          <span class="stat-icon">📚</span>
-          <span class="stat-value">${(state.study.totalToday || 0).toFixed(1)}h</span>
-          <span class="stat-label">Estudo hoje</span>
-        </div>
-        <div class="stat-card">
-          <span class="stat-icon">💧</span>
-          <span class="stat-value">${state.health.waterGlasses}/8</span>
-          <span class="stat-label">Copos d'água</span>
-        </div>
-        <div class="stat-card">
-          <span class="stat-icon">🧠</span>
-          <span class="stat-value">${state.mental.mood || '—'}</span>
-          <span class="stat-label">Humor</span>
-        </div>
-        <div class="stat-card">
-          <span class="stat-icon">🍅</span>
-          <span class="stat-value">${state.study.pomodorosTotal || 0}</span>
-          <span class="stat-label">Pomodoros total</span>
-        </div>
-        <div class="stat-card">
-          <span class="stat-icon">🏆</span>
-          <span class="stat-value">${state.achievements.length}/13</span>
-          <span class="stat-label">Conquistas</span>
-        </div>
-        <div class="stat-card">
-          <span class="stat-icon">💪</span>
-          <span class="stat-value">${state.health.workout ? 'Sim' : 'Não'}</span>
-          <span class="stat-label">Treinou hoje</span>
-        </div>
-      </div>
+      <div class="section-label">Resumo de hoje</div>
+      <div class="stats-grid">${statsHTML}</div>
 
       <div class="quick-btns">
-        <button class="quick-btn" onclick="navigate('checklist')">📋 Tarefas</button>
-        <button class="quick-btn" onclick="navigate('study')">🍅 Pomodoro</button>
-        <button class="quick-btn" onclick="navigate('mental')">🧠 Mental</button>
-        <button class="quick-btn" onclick="navigate('minimal')">🌱 Dia difícil</button>
-      </div>
-
-      <div class="card quote-card">
-        <div class="quote-text">"${quote}"</div>
+        <button class="quick-btn" onclick="navigate('minimal')">🌙 Dia difícil</button>
+        <button class="quick-btn" onclick="navigate('reports')">📊 Ver progresso</button>
+        <button class="quick-btn" onclick="navigate('achievements')">🏆 Conquistas</button>
       </div>
     </div>
-  `;
+  `);
 }
 
-// ========== CHECKLIST ==========
-function renderChecklist(container) {
-  const tasks = state.tasks;
-  const done = tasks.filter(t => t.status === 'done').length;
-  const partial = tasks.filter(t => t.status === 'partial').length;
-  const total = tasks.length;
-  const pct = total ? Math.round(((done + partial * 0.5) / total) * 100) : 0;
+// ============================================================
+// CHECKLIST
+// ============================================================
+function renderChecklist() {
+  const day = today();
+  const done = day.tasks.filter(t => t.status === 'done').length;
+  const partial = day.tasks.filter(t => t.status === 'partial').length;
+  const total = day.tasks.length;
+  const pts = done + partial * 0.5;
+  const pct = total ? Math.round(pts / total * 100) : 0;
+  const score = calcScore(day);
 
-  const motivTexts = [
-    'Vamos lá! O primeiro passo é o mais difícil.',
-    'Bom começo! Continue assim.',
-    'Na metade! Você consegue.',
-    'Quase lá! Não para agora.',
-    'Incrível! Dia produtivo garantido.',
-  ];
-  const motivIdx = Math.min(Math.floor(pct / 25), 4);
-
-  // Group tasks by category
-  const categories = {};
-  tasks.forEach(t => {
-    if (!categories[t.category]) categories[t.category] = [];
-    categories[t.category].push(t);
+  const byCategory = {};
+  day.tasks.forEach(t => {
+    if (!byCategory[t.category]) byCategory[t.category] = [];
+    byCategory[t.category].push(t);
   });
 
-  const taskRows = Object.entries(categories).map(([cat, catTasks]) => `
-    <div class="category-label">${cat}</div>
-    ${catTasks.map(task => `
-      <div class="task-item" id="task-${task.id}">
-        <span class="task-name ${task.status === 'done' ? 'done' : task.status === 'skip' ? 'skip' : ''}">${task.name}</span>
+  const tasksHTML = Object.entries(byCategory).map(([cat, tasks]) =>
+    `<div class="category-label">${cat}</div>` +
+    tasks.map(t => `
+      <div class="task-item" id="task-${t.id}">
         <div class="task-btns">
-          <button class="task-btn ${task.status === 'done' ? 'done' : ''}" onclick="setTaskStatus('${task.id}','done')" title="Feito">✓</button>
-          <button class="task-btn ${task.status === 'partial' ? 'partial' : ''}" onclick="setTaskStatus('${task.id}','partial')" title="Parcial">~</button>
-          <button class="task-btn ${task.status === 'skip' ? 'skip' : ''}" onclick="setTaskStatus('${task.id}','skip')" title="Pular">✕</button>
+          <button class="task-btn${t.status==='done'?' done':''}" onclick="setTaskStatus(${t.id},'done')" title="Feita">✓</button>
+          <button class="task-btn${t.status==='partial'?' partial':''}" onclick="setTaskStatus(${t.id},'partial')" title="Parcial">∼</button>
+          <button class="task-btn${t.status==='skip'?' skip':''}" onclick="setTaskStatus(${t.id},'skip')" title="Pulei">×</button>
         </div>
-      </div>
-    `).join('')}
-  `).join('');
+        <span class="task-name${t.status==='done'?' done':t.status==='skip'?' skip':''}">${esc(t.name)}</span>
+        <button class="task-delete-btn" onclick="deleteTask(${t.id})" title="Remover">🗑</button>
+      </div>`
+    ).join('')
+  ).join('');
 
-  container.innerHTML = `
+  setContent(`
     <div class="screen-content">
       <div class="screen-header">
-        <span style="font-size:26px">✅</span>
-        <h1 class="screen-title">Tarefas de Hoje</h1>
+        <span class="screen-title">Hoje</span>
+        <span style="font-size:22px;font-weight:800;color:${getScoreColor(score)}">${score} pts</span>
       </div>
-      <div class="card">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <span style="font-size:14px;color:var(--text2)">${done} de ${total} concluídas</span>
-          <span style="font-weight:800;color:var(--accent)">${pct}%</span>
+      <div class="progress-hero">
+        <div class="progress-hero-top">
+          <div>
+            <div class="progress-pct" style="color:${getScoreColor(pct)}">${pct}%</div>
+            <div class="progress-label">${done} de ${total} concluídas</div>
+          </div>
+          <button class="btn-sm" style="background:var(--surface2);border:1.5px solid var(--border);color:var(--text2)" onclick="resetDayTasks()">↺ Reiniciar</button>
         </div>
-        <div class="progress-bar-wrap" style="margin-top:10px">
-          <div class="progress-bar-fill" style="width:${pct}%"></div>
-        </div>
-        <div class="progress-text">${motivTexts[motivIdx]}</div>
-      </div>
-
-      <div class="card">
-        ${taskRows}
+        <div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:${pct}%"></div></div>
+        <div class="progress-motivation">${getMotivation(pct)}</div>
       </div>
 
       <div class="card">
-        <div class="section-label">Adicionar tarefa</div>
-        <div class="form-group">
-          <input class="form-input" id="new-task-name" placeholder="Nome da tarefa" />
+        ${tasksHTML || '<p style="color:var(--text3);text-align:center;padding:16px 0">Nenhuma tarefa. Adicione abaixo!</p>'}
+      </div>
+
+      <div class="card">
+        <div class="card-title">Adicionar tarefa</div>
+        <select class="form-select" id="new-task-cat" style="margin-bottom:8px">
+          ${CATEGORIES.map(c => `<option>${c}</option>`).join('')}
+        </select>
+        <div style="display:flex;gap:8px">
+          <input class="form-input" id="new-task-name" placeholder="Nome da tarefa..." style="flex:1;margin:0" onkeydown="if(event.key==='Enter')addTask()" />
+          <button class="btn-primary" style="flex:0;padding:12px 18px;font-size:20px" onclick="addTask()">+</button>
         </div>
-        <div class="form-group">
-          <select class="form-select" id="new-task-cat">
-            <option>Saúde</option>
-            <option>Treino</option>
-            <option>Estudos</option>
-            <option>Mentalidade</option>
-            <option>Organização</option>
-            <option>Trabalho</option>
-            <option>Finanças</option>
-            <option>Outro</option>
-          </select>
-        </div>
-        <button class="btn-primary" onclick="addTask()">+ Adicionar</button>
       </div>
     </div>
-  `;
+  `);
 }
 
 function setTaskStatus(id, status) {
-  const task = state.tasks.find(t => t.id === id);
+  const day = today();
+  const task = day.tasks.find(t => t.id === id);
   if (!task) return;
-  const wasNotDone = task.status !== 'done';
+  const prev = task.status;
   task.status = task.status === status ? 'pending' : status;
-  if (task.status === 'done' && wasNotDone) {
-    state.totalTasksDone = (state.totalTasksDone || 0) + 1;
-    addXp(10);
-    showToast('Tarefa concluída! +10 XP', 'success');
+  if (task.status === 'done' && prev !== 'done') {
+    addXP(10, 'Tarefa');
+    state.totalTasks++;
+    const el = document.getElementById('task-' + id);
+    if (el) el.classList.add('completing');
   }
-  saveState();
-  navigate('checklist');
+  today().score = calcScore(today());
+  save();
+  checkAchievements();
+  renderChecklist();
+}
+
+function deleteTask(id) {
+  today().tasks = today().tasks.filter(t => t.id !== id);
+  save(); renderChecklist();
 }
 
 function addTask() {
-  const name = document.getElementById('new-task-name')?.value.trim();
-  const cat = document.getElementById('new-task-cat')?.value || 'Outro';
-  if (!name) { showToast('Digite o nome da tarefa', 'error'); return; }
-  state.tasks.push({ id: 't' + Date.now(), name, category: cat, status: 'pending' });
-  saveState();
-  navigate('checklist');
-  showToast('Tarefa adicionada!', 'success');
+  const name = document.getElementById('new-task-name')?.value?.trim();
+  const cat = document.getElementById('new-task-cat')?.value || 'Organização';
+  if (!name) return;
+  today().tasks.push({ id: state.nextTaskId++, name, category: cat, status: 'pending' });
+  save(); renderChecklist();
 }
 
-// ========== HABITS ==========
-function renderHabits(container) {
-  const habits = state.habits;
-  const checkedCount = habits.filter(h => h.checkedToday).length;
+function resetDayTasks() {
+  if (!confirm('Desmarcar todas as tarefas?')) return;
+  today().tasks.forEach(t => t.status = 'pending');
+  save(); renderChecklist();
+}
 
-  const habitRows = habits.map(h => `
-    <div class="habit-item">
-      <span class="habit-emoji">${h.emoji || '⭐'}</span>
-      <div class="habit-info">
-        <div class="habit-name">${h.name}</div>
-        <div class="habit-streak">🔥 ${h.streak || 0} dias de streak ${h.category ? '• ' + h.category : ''}</div>
-      </div>
-      <button class="habit-check ${h.checkedToday ? 'checked' : ''}" onclick="toggleHabit('${h.id}')">
-        ${h.checkedToday ? '✓' : ''}
-      </button>
-    </div>
-  `).join('');
+// ============================================================
+// HABITS
+// ============================================================
+function renderHabits() {
+  const day = today();
+  const habitsHTML = state.habits.map(h => {
+    const checked = day.habitsChecked[h.id] || false;
+    const impClass = h.importance === 'alta' ? 'imp-alta' : h.importance === 'média' ? 'imp-media' : 'imp-baixa';
+    return `
+      <div class="habit-item">
+        <div class="habit-emoji">${h.emoji}</div>
+        <div class="habit-info">
+          <div class="habit-name">${esc(h.name)}</div>
+          <div class="habit-meta">
+            <span>${h.category}</span>
+            <span class="imp-badge ${impClass}">${h.importance}</span>
+            <span class="habit-streak-badge">🔥 ${h.streak} dias</span>
+          </div>
+        </div>
+        <div class="habit-check${checked?' checked':''}" onclick="toggleHabit(${h.id})">${checked ? '✓' : ''}</div>
+        <button style="background:none;border:none;color:var(--text3);font-size:18px;cursor:pointer;margin-left:4px" onclick="deleteHabit(${h.id})">×</button>
+      </div>`;
+  }).join('');
 
-  container.innerHTML = `
+  setContent(`
     <div class="screen-content">
-      <div class="screen-header">
-        <span style="font-size:26px">🔥</span>
-        <h1 class="screen-title">Hábitos</h1>
-      </div>
-
+      <div class="screen-header"><span class="screen-title">Hábitos</span></div>
       <div class="card">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-          <span style="color:var(--text2);font-size:14px">${checkedCount}/${habits.length} hoje</span>
-          <span style="color:var(--accent);font-weight:700">${habits.length ? Math.round((checkedCount/habits.length)*100) : 0}%</span>
-        </div>
-        <div class="progress-bar-wrap">
-          <div class="progress-bar-fill" style="width:${habits.length ? (checkedCount/habits.length)*100 : 0}%"></div>
-        </div>
+        ${habitsHTML || '<p style="color:var(--text3);text-align:center;padding:12px 0">Nenhum hábito ainda.</p>'}
       </div>
-
       <div class="card">
-        ${habitRows || '<p style="color:var(--text2);font-size:14px">Nenhum hábito ainda.</p>'}
-      </div>
-
-      <div class="card">
-        <div class="section-label">Novo hábito</div>
-        <div style="display:flex;gap:10px;margin-bottom:12px">
-          <input class="form-input" id="new-habit-emoji" placeholder="Emoji" style="width:70px" maxlength="2" />
-          <input class="form-input" id="new-habit-name" placeholder="Nome do hábito" />
+        <div class="card-title">Novo hábito</div>
+        <div style="display:flex;gap:8px;margin-bottom:8px">
+          <input class="form-input" id="new-habit-emoji" placeholder="🌙" maxlength="2" style="width:60px;flex:none;text-align:center" />
+          <input class="form-input" id="new-habit-name" placeholder="Nome do hábito" style="flex:1" />
         </div>
-        <div style="display:flex;gap:10px;margin-bottom:12px">
-          <select class="form-select" id="new-habit-cat">
-            <option>Saúde</option><option>Treino</option><option>Estudos</option>
-            <option>Mentalidade</option><option>Organização</option><option>Finanças</option><option>Outro</option>
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+          <select class="form-select" id="new-habit-cat" style="flex:1">
+            ${CATEGORIES.map(c => `<option>${c}</option>`).join('')}
           </select>
-          <select class="form-select" id="new-habit-imp">
+          <select class="form-select" id="new-habit-imp" style="flex:1">
             <option value="alta">Alta</option>
-            <option value="media">Média</option>
+            <option value="média" selected>Média</option>
             <option value="baixa">Baixa</option>
           </select>
         </div>
-        <button class="btn-primary" onclick="addHabit()">+ Adicionar Hábito</button>
+        <button class="btn-primary" style="width:100%" onclick="addHabit()">Adicionar hábito</button>
       </div>
     </div>
-  `;
+  `);
 }
 
 function toggleHabit(id) {
+  const day = today();
+  const prev = day.habitsChecked[id] || false;
+  day.habitsChecked[id] = !prev;
   const habit = state.habits.find(h => h.id === id);
-  if (!habit) return;
-  habit.checkedToday = !habit.checkedToday;
-  if (habit.checkedToday) {
-    state.totalHabitsDone = (state.totalHabitsDone || 0) + 1;
-    addXp(15);
-    showToast(`${habit.emoji} ${habit.name} — +15 XP`, 'success');
+  if (!prev && habit) {
+    habit.streak = (habit.streak || 0) + 1;
+    habit.history = habit.history || [];
+    habit.history.push(state.today);
+    addXP(15, 'Hábito');
+    state.totalHabits++;
+  } else if (prev && habit) {
+    habit.streak = Math.max(0, (habit.streak || 1) - 1);
   }
-  saveState();
-  navigate('habits');
+  today().score = calcScore(today());
+  save(); checkAchievements(); renderHabits();
+}
+
+function deleteHabit(id) {
+  if (!confirm('Remover este hábito?')) return;
+  state.habits = state.habits.filter(h => h.id !== id);
+  delete today().habitsChecked[id];
+  save(); renderHabits();
 }
 
 function addHabit() {
-  const emoji = document.getElementById('new-habit-emoji')?.value.trim() || '⭐';
-  const name = document.getElementById('new-habit-name')?.value.trim();
-  const category = document.getElementById('new-habit-cat')?.value || 'Outro';
-  const importance = document.getElementById('new-habit-imp')?.value || 'media';
-  if (!name) { showToast('Digite o nome do hábito', 'error'); return; }
-  state.habits.push({ id: 'h' + Date.now(), emoji, name, category, importance, streak: 0, lastChecked: null, checkedToday: false });
-  saveState();
-  navigate('habits');
-  showToast('Hábito adicionado!', 'success');
+  const name = document.getElementById('new-habit-name')?.value?.trim();
+  const emoji = document.getElementById('new-habit-emoji')?.value?.trim() || '⭐';
+  const category = document.getElementById('new-habit-cat')?.value || 'Saúde';
+  const importance = document.getElementById('new-habit-imp')?.value || 'média';
+  if (!name) { showToast('Nome do hábito obrigatório', 'error'); return; }
+  state.habits.push({ id: state.nextHabitId++, emoji, name, category, importance, streak: 0, history: [] });
+  save(); renderHabits();
 }
 
-// ========== STUDY ==========
-function renderStudy(container) {
-  const sessions = state.study.sessions || [];
-  const modeLabels = { work: '🍅 Foco (25min)', short: '☕ Pausa curta (5min)', long: '🛋️ Pausa longa (15min)' };
-  const modeSecs = { work: 25 * 60, short: 5 * 60, long: 15 * 60 };
+// ============================================================
+// STUDY
+// ============================================================
+function renderStudy() {
+  const day = today();
+  const totalH = Math.floor(day.study.totalMinutes / 60);
+  const totalM = day.study.totalMinutes % 60;
+  const mm = String(Math.floor(pomodoroSeconds / 60)).padStart(2, '0');
+  const ss = String(pomodoroSeconds % 60).padStart(2, '0');
+  const modeColors = { work: 'work', short: 'short', long: 'long' };
+  const modeLabels = { work: 'Foco 📊', short: 'Pausa curta ☕', long: 'Pausa longa 🛌' };
 
-  container.innerHTML = `
+  const sessionsHTML = day.study.sessions.length
+    ? day.study.sessions.map(s =>
+        `<div class="session-item"><span class="session-subject">${esc(s.subject)}</span><span class="session-time">${s.minutes} min</span></div>`
+      ).join('')
+    : '<p style="color:var(--text3);text-align:center;padding:12px 0">Nenhuma sessão ainda.</p>';
+
+  setContent(`
     <div class="screen-content">
-      <div class="screen-header">
-        <span style="font-size:26px">📚</span>
-        <h1 class="screen-title">Estudos</h1>
-      </div>
+      <div class="screen-header"><span class="screen-title">Estudos</span></div>
 
-      <div class="card" style="text-align:center">
-        <div style="font-size:13px;color:var(--text2);margin-bottom:4px">Horas hoje</div>
-        <div style="font-size:40px;font-weight:900;color:var(--accent)">${(state.study.totalToday || 0).toFixed(1)}h</div>
-        <div style="font-size:13px;color:var(--text3)">Total pomodoros: ${state.study.pomodorosTotal || 0}</div>
-      </div>
-
-      <div class="pomodoro-display">
-        <div class="pomo-mode" id="pomo-mode-label">${modeLabels[pomodoroMode]}</div>
-        <div class="pomo-time" id="pomo-time">${formatTime(pomodoroRunning ? pomodoroSeconds : modeSecs[pomodoroMode])}</div>
-        <div class="pomo-btns">
-          <button class="btn-sm" style="background:var(--accent);color:#fff" onclick="pomodoroToggle()" id="pomo-play">${pomodoroRunning ? '⏸ Pausar' : '▶ Iniciar'}</button>
-          <button class="btn-sm" style="background:var(--surface2);color:var(--text);border:1.5px solid var(--border)" onclick="pomodoroReset()">⟳ Reset</button>
+      <div class="study-total-card">
+        <div>
+          <div class="study-total-val">${totalH}h ${totalM}min</div>
+          <div class="study-total-label">estudados hoje</div>
         </div>
-        <div style="display:flex;gap:8px;justify-content:center;margin-top:12px;flex-wrap:wrap">
-          ${Object.entries(modeLabels).map(([k,v]) => `
-            <button class="btn-sm" style="background:${k===pomodoroMode?'var(--surface)':'var(--surface2)'};color:var(--text);border:${k===pomodoroMode?'2px solid var(--accent)':'1.5px solid var(--border)'}" onclick="setPomoMode('${k}')">${v}</button>
-          `).join('')}
+        <span style="font-size:40px">📚</span>
+      </div>
+
+      <div class="pomodoro-card ${modeColors[pomodoroMode]}">
+        <div class="pomo-mode-tabs">
+          <button class="pomo-tab${pomodoroMode==='work'?' active':''}" onclick="setPomodoroMode('work')">Foco 25</button>
+          <button class="pomo-tab${pomodoroMode==='short'?' active':''}" onclick="setPomodoroMode('short')">Pausa 5</button>
+          <button class="pomo-tab${pomodoroMode==='long'?' active':''}" onclick="setPomodoroMode('long')">Pausa 15</button>
+        </div>
+        <div class="pomo-mode-label">${modeLabels[pomodoroMode]}</div>
+        <div class="pomo-time${pomodoroMode==='work'?' work-color':pomodoroMode==='short'?' short-color':''}" id="pomo-display">${mm}:${ss}</div>
+        <div class="pomo-btns">
+          <button class="btn-primary" style="flex:none;padding:12px 24px" onclick="togglePomodoro()">${pomodoroRunning ? '⏸ Pausar' : '▶ Iniciar'}</button>
+          <button class="btn-ghost" style="flex:none;padding:12px 18px" onclick="resetPomodoro()">↺ Reset</button>
         </div>
       </div>
 
       <div class="card">
-        <div class="section-label">Registrar sessão</div>
-        <div style="display:flex;gap:10px;margin-bottom:10px">
-          <input class="form-input" id="session-subject" placeholder="Matéria/Assunto" />
-          <input class="form-input" id="session-hours" type="number" placeholder="Horas" step="0.5" min="0.25" max="12" style="width:90px" />
-        </div>
-        <button class="btn-primary" onclick="logSession()">+ Registrar</button>
+        <div class="card-title">Registrar sessão manual</div>
+        <input class="form-input" id="study-subject" placeholder="Matéria / assunto" />
+        <input class="form-input" id="study-mins" type="number" placeholder="Minutos estudados" min="1" max="600" />
+        <button class="btn-primary" style="width:100%" onclick="addStudySession()">Registrar</button>
       </div>
 
-      ${sessions.length ? `
-        <div class="card">
-          <div class="section-label">Sessões de hoje</div>
-          ${sessions.map(s => `
-            <div class="session-item">
-              <span>${s.subject}</span>
-              <span style="color:var(--accent);font-weight:700">${s.hours}h</span>
-            </div>
-          `).join('')}
-        </div>
-      ` : ''}
+      <div class="card">
+        <div class="card-title">Sessões de hoje</div>
+        ${sessionsHTML}
+      </div>
     </div>
-  `;
+  `);
 }
 
-function formatTime(secs) {
-  const m = Math.floor(secs / 60).toString().padStart(2, '0');
-  const s = (secs % 60).toString().padStart(2, '0');
-  return `${m}:${s}`;
-}
-
-function setPomoMode(mode) {
+function setPomodoroMode(mode) {
+  if (pomodoroRunning) { clearInterval(pomodoroInterval); pomodoroRunning = false; }
   pomodoroMode = mode;
-  const modeSecs = { work: 25 * 60, short: 5 * 60, long: 15 * 60 };
-  pomodoroSeconds = modeSecs[mode];
-  if (pomodoroRunning) {
-    clearInterval(pomodoroInterval);
-    pomodoroRunning = false;
-  }
-  navigate('study');
+  pomodoroSeconds = mode === 'work' ? 25*60 : mode === 'short' ? 5*60 : 15*60;
+  renderStudy();
 }
 
-function pomodoroToggle() {
+function togglePomodoro() {
   if (pomodoroRunning) {
     clearInterval(pomodoroInterval);
     pomodoroRunning = false;
-    const btn = document.getElementById('pomo-play');
-    if (btn) btn.textContent = '▶ Iniciar';
   } else {
     pomodoroRunning = true;
-    const btn = document.getElementById('pomo-play');
-    if (btn) btn.textContent = '⏸ Pausar';
     pomodoroInterval = setInterval(() => {
       pomodoroSeconds--;
-      const timeEl = document.getElementById('pomo-time');
-      if (timeEl) timeEl.textContent = formatTime(pomodoroSeconds);
       if (pomodoroSeconds <= 0) {
         clearInterval(pomodoroInterval);
         pomodoroRunning = false;
+        const mins = pomodoroMode === 'work' ? 25 : pomodoroMode === 'short' ? 5 : 15;
         if (pomodoroMode === 'work') {
-          state.study.totalToday = (state.study.totalToday || 0) + 25/60;
-          state.study.pomodorosTotal = (state.study.pomodorosTotal || 0) + 1;
-          state.totalPomodoros = (state.totalPomodoros || 0) + 1;
-          addXp(20);
-          saveState();
-          showToast('🍅 Pomodoro completo! +20 XP', 'success');
-          pomodoroMode = 'short';
-          pomodoroSeconds = 5 * 60;
+          addXP(20, 'Pomodoro');
+          state.totalPomodoros++;
+          today().study.sessions.push({ subject: 'Pomodoro', minutes: 25 });
+          today().study.totalMinutes += 25;
+          showToast('🍅 Pomodoro concluído! Faz uma pausa.', 'success');
+          checkAchievements();
         } else {
-          showToast('☕ Pausa acabou! Hora de focar.', 'info');
-          pomodoroMode = 'work';
-          pomodoroSeconds = 25 * 60;
+          showToast('✅ Pausa encerrada! Hora de focar.', 'info');
         }
-        navigate('study');
+        pomodoroSeconds = pomodoroMode === 'work' ? 25*60 : pomodoroMode === 'short' ? 5*60 : 15*60;
+        save();
+        renderStudy();
+        return;
+      }
+      if (currentScreen === 'study') {
+        const el = document.getElementById('pomo-display');
+        if (el) el.textContent = String(Math.floor(pomodoroSeconds/60)).padStart(2,'0') + ':' + String(pomodoroSeconds%60).padStart(2,'0');
       }
     }, 1000);
   }
+  renderStudy();
 }
 
-function pomodoroReset() {
-  if (pomodoroRunning) { clearInterval(pomodoroInterval); pomodoroRunning = false; }
-  const modeSecs = { work: 25 * 60, short: 5 * 60, long: 15 * 60 };
-  pomodoroSeconds = modeSecs[pomodoroMode];
-  navigate('study');
+function resetPomodoro() {
+  clearInterval(pomodoroInterval);
+  pomodoroRunning = false;
+  pomodoroSeconds = pomodoroMode === 'work' ? 25*60 : pomodoroMode === 'short' ? 5*60 : 15*60;
+  renderStudy();
 }
 
-function logSession() {
-  const subject = document.getElementById('session-subject')?.value.trim();
-  const hours = parseFloat(document.getElementById('session-hours')?.value);
-  if (!subject || !hours || isNaN(hours)) { showToast('Preencha matéria e horas', 'error'); return; }
-  if (!state.study.sessions) state.study.sessions = [];
-  state.study.sessions.push({ subject, hours, time: new Date().toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'}) });
-  state.study.totalToday = (state.study.totalToday || 0) + hours;
-  addXp(10);
-  saveState();
-  navigate('study');
-  showToast(`📚 ${hours}h de ${subject} registradas! +10 XP`, 'success');
+function addStudySession() {
+  const subject = document.getElementById('study-subject')?.value?.trim();
+  const mins = parseInt(document.getElementById('study-mins')?.value);
+  if (!subject || !mins || mins < 1) { showToast('Preencha os campos', 'error'); return; }
+  today().study.sessions.push({ subject, minutes: mins });
+  today().study.totalMinutes += mins;
+  addXP(Math.round(mins / 5), 'Estudo');
+  save(); checkAchievements(); renderStudy();
 }
 
-// ========== HEALTH ==========
-function renderHealth(container) {
-  const h = state.health;
-  const workoutTypes = ['Musculação', 'Corrida', 'Ciclismo', 'Natação', 'Yoga', 'Futebol', 'Outro'];
+// ============================================================
+// HEALTH
+// ============================================================
+function renderHealth() {
+  const h = today().health;
+  const waterGlasses = Array.from({length:8}, (_,i) =>
+    `<div class="water-glass${i < h.water ? ' filled' : ''}" onclick="setWater(${i+1})">💧</div>`
+  ).join('');
 
-  container.innerHTML = `
+  setContent(`
     <div class="screen-content">
-      <div class="screen-header">
-        <span style="font-size:26px">💪</span>
-        <h1 class="screen-title">Saúde & Treino</h1>
-      </div>
+      <div class="screen-header"><span class="screen-title">Treino & Saúde</span></div>
 
       <div class="card">
-        <div class="section-label">Água (${h.waterGlasses}/8 copos)</div>
-        <div class="water-grid">
-          ${[...Array(8)].map((_, i) => `
-            <div class="water-glass ${i < h.waterGlasses ? 'filled' : ''}" onclick="setWater(${i+1})">💧</div>
-          `).join('')}
+        <div class="card-title">💧 Consumo de água</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <span style="color:var(--text2);font-size:14px">${h.water} de 8 copos</span>
+          <span style="font-size:13px;color:var(--accent2);font-weight:700">${Math.round(h.water/8*100)}%</span>
         </div>
-        <div style="font-size:13px;color:var(--text2);margin-top:8px">${h.waterGlasses >= 8 ? '✅ Meta atingida!' : `${8 - h.waterGlasses} copos para a meta`}</div>
+        <div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:${Math.min(100,h.water/8*100)}%"></div></div>
+        <div class="water-grid">${waterGlasses}</div>
       </div>
 
       <div class="card">
-        <div class="section-label">Treino hoje</div>
-        <div class="toggle-row">
-          <span class="toggle-label">Treinei hoje</span>
-          <div class="toggle ${h.workout ? 'on' : ''}" onclick="toggleWorkout()"></div>
+        <div class="card-title">💪 Treino de hoje</div>
+        <div class="workout-toggle">
+          <button class="toggle-btn${h.workout===true?' active-yes':''}" onclick="setWorkout(true)">✓ Treinei</button>
+          <button class="toggle-btn${h.workout===false?' active-no':''}" onclick="setWorkout(false)">× Não treinei</button>
         </div>
-        ${h.workout ? `
-          <div class="form-group" style="margin-top:12px">
-            <label class="form-label">Tipo de treino</label>
-            <select class="form-select" id="workout-type" onchange="setWorkoutType(this.value)">
-              ${workoutTypes.map(t => `<option ${h.workoutType===t?'selected':''}>${t}</option>`).join('')}
-            </select>
-          </div>
-        ` : ''}
+        ${h.workout===true ? `<input class="form-input" id="workout-type" placeholder="Tipo: musculação, corrida, yoga..." value="${esc(h.workoutType||'')}" oninput="saveWorkoutType(this.value)" />` : ''}
       </div>
 
       <div class="card">
-        <div class="section-label">Sono</div>
-        <div class="form-group">
-          <label class="form-label">Horas de sono: <strong>${h.sleepHours || 7}h</strong></label>
-          <input type="range" class="range-input" min="2" max="12" step="0.5" value="${h.sleepHours || 7}"
-            oninput="setSleep(this.value)" />
-          <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3)"><span>2h</span><span>12h</span></div>
+        <div class="card-title">😴 Sono ontem (horas)</div>
+        <div style="display:flex;gap:8px">
+          <input class="form-input" id="sleep-input" type="number" placeholder="Ex: 7.5" min="0" max="24" step="0.5" value="${h.sleep||''}" style="flex:1" />
+          <button class="btn-primary" style="flex:none;padding:12px 16px" onclick="saveSleep()">Salvar</button>
+        </div>
+        ${h.sleep > 0 && h.sleep < 6 ? '<p style="color:var(--red);font-size:13px;margin-top:8px">⚠️ Sono abaixo de 6h. Tente dormir mais cedo hoje.</p>' : ''}
+      </div>
+
+      <div class="card">
+        <div class="card-title">⚖️ Peso corporal (kg)</div>
+        <div style="display:flex;gap:8px">
+          <input class="form-input" id="weight-input" type="number" placeholder="Ex: 75.2" step="0.1" value="${h.weight||''}" style="flex:1" />
+          <button class="btn-primary" style="flex:none;padding:12px 16px" onclick="saveWeight()">Salvar</button>
         </div>
       </div>
 
       <div class="card">
-        <div class="section-label">Peso (kg)</div>
-        <input class="form-input" id="weight-input" type="number" placeholder="Ex: 70.5" step="0.1" value="${h.weight || ''}" oninput="setWeight(this.value)" />
-      </div>
-
-      <div class="card">
-        <div class="section-label">Nível de energia</div>
+        <div class="card-title">⚡ Nível de energia hoje</div>
         <div class="energy-btns">
-          ${['😴','😐','🙂','😊','🔥'].map((e, i) => `
-            <button class="energy-btn ${h.energyLevel === i+1 ? 'selected' : ''}" onclick="setEnergy(${i+1})">${e}</button>
-          `).join('')}
+          ${['😴','😕','😐','🙂','😄'].map((e,i) =>
+            `<button class="energy-btn${h.energy===i+1?' selected':''}" onclick="setEnergy(${i+1})">${e}<br><span style="font-size:10px;color:var(--text3)">${i+1}</span></button>`
+          ).join('')}
         </div>
-        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3);margin-top:6px"><span>Sem energia</span><span>Energia máxima</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3);margin-top:6px">
+          <span>Esgotado</span><span>No limite</span>
+        </div>
       </div>
     </div>
-  `;
+  `);
 }
 
-function setWater(glasses) {
-  state.health.waterGlasses = glasses;
-  if (glasses >= 8) { addXp(10); showToast('💧 Meta de água atingida! +10 XP', 'success'); }
-  saveState();
-  navigate('health');
+function setWater(n) {
+  const h = today().health;
+  h.water = h.water === n ? n - 1 : n;
+  if (h.water < 0) h.water = 0;
+  if (n > h.water + 1 || (h.water >= 1)) addXP(2, 'Água');
+  save(); renderHealth();
 }
 
-function toggleWorkout() {
-  state.health.workout = !state.health.workout;
-  if (state.health.workout) { addXp(20); showToast('💪 Treino registrado! +20 XP', 'success'); }
-  saveState();
-  navigate('health');
+function setWorkout(val) {
+  today().health.workout = val;
+  if (val) { addXP(30, 'Treino'); checkAchievements(); }
+  save(); renderHealth();
 }
 
-function setWorkoutType(val) {
-  state.health.workoutType = val;
-  saveState();
+function saveWorkoutType(val) { today().health.workoutType = val; save(); }
+
+function saveSleep() {
+  const v = parseFloat(document.getElementById('sleep-input')?.value);
+  if (!isNaN(v) && v >= 0) { today().health.sleep = v; save(); showToast('Sono registrado!', 'success'); renderHealth(); }
 }
 
-function setSleep(val) {
-  state.health.sleepHours = parseFloat(val);
-  document.querySelector('.form-label strong') && (document.querySelector('.form-label strong').textContent = val + 'h');
-  saveState();
+function saveWeight() {
+  const v = parseFloat(document.getElementById('weight-input')?.value);
+  if (!isNaN(v) && v > 0) { today().health.weight = v; save(); showToast('Peso registrado!', 'success'); }
 }
 
-function setWeight(val) {
-  state.health.weight = val;
-  saveState();
-}
+function setEnergy(n) { today().health.energy = n; save(); renderHealth(); }
 
-function setEnergy(val) {
-  state.health.energyLevel = val;
-  saveState();
-  navigate('health');
-}
+// ============================================================
+// MENTAL
+// ============================================================
+function renderMental() {
+  const m = today().mental;
+  const moods = ['😄','🙂','😐','😔','😣'];
+  const anxietyHigh = m.anxiety >= 7;
 
-// ========== MENTAL ==========
-const MOODS = ['😢','😕','😐','🙂','😄'];
-const MOOD_LABELS = ['Péssimo','Ruim','Ok','Bem','Ótimo'];
+  let reflection = '';
+  if (m.mood || m.goodThing || m.worry) {
+    if (m.anxiety >= 8) reflection = 'A ansiedade está alta hoje. Mas você abriu o app e registrou. Isso já é autoconsciência. Começa com 5 minutos de respiração.';
+    else if (m.mood === '😣' || m.mood === '😔') reflection = 'Dia pesado. Não precisa ser perfeito. Só precisa não abandonar você mesmo.';
+    else if (m.mood === '😄') reflection = 'Bom humor hoje. Aproveita esse estádo pra fazer aquilo que você vem adiando.';
+    else if (m.goodThing && m.worry) reflection = 'Você viu o lado bom e o que te pesa. Esse equilíbrio é maturidade. Continue vindo aqui.';
+    else if (m.goodThing) reflection = 'Tem coisa boa acontecendo. Reconhecer isso é importante pra não deixar o ruim dominar.';
+    else if (m.blocker) reflection = 'Identificar o que te bloqueia já é metade da solução. Amanhã você pode trabalhar direto nisso.';
+    else reflection = 'Registrar como você está é o primeiro passo pra mudar. Continue vindo aqui.';
+  }
 
-function renderMental(container) {
-  const m = state.mental;
-
-  const reflection = generateReflection(m);
-
-  container.innerHTML = `
+  setContent(`
     <div class="screen-content">
-      <div class="screen-header">
-        <span style="font-size:26px">🧠</span>
-        <h1 class="screen-title">Diário Mental</h1>
-      </div>
+      <div class="screen-header"><span class="screen-title">Diário Mental</span></div>
 
       <div class="card">
-        <div class="section-label">Como você está hoje?</div>
+        <div class="card-title">Como você está hoje?</div>
         <div class="mood-btns">
-          ${MOODS.map((mood, i) => `
-            <button class="mood-btn ${m.mood === mood ? 'selected' : ''}" onclick="setMood('${mood}')" title="${MOOD_LABELS[i]}">${mood}</button>
-          `).join('')}
-        </div>
-        <div style="text-align:center;font-size:13px;color:var(--text2);margin-top:6px">
-          ${m.mood ? MOOD_LABELS[MOODS.indexOf(m.mood)] : 'Selecione seu humor'}
+          ${moods.map(e => `<button class="mood-btn${m.mood===e?' selected':''}" onclick="setMood('${e}')">${e}</button>`).join('')}
         </div>
       </div>
 
       <div class="card">
+        <div class="card-title">Nível de ansiedade</div>
         <div class="slider-group">
-          <div class="slider-label"><span>Ansiedade</span><strong style="color:var(--orange)">${m.anxiety}/10</strong></div>
-          <input type="range" class="range-input" min="0" max="10" value="${m.anxiety}" oninput="setMentalSlider('anxiety',this.value)" />
+          <div class="slider-label">
+            <span>😌 Calmo</span>
+            <span class="slider-label-end" id="anx-val">${m.anxiety}</span>
+            <span>😱 Ansioso</span>
+          </div>
+          <input class="range-input" type="range" min="0" max="10" value="${m.anxiety}"
+            oninput="updateAnxiety(+this.value)" />
         </div>
+        ${anxietyHigh ? `
+        <div class="anxiety-alert">
+          <span style="font-size:22px">🚨</span>
+          <div>
+            <div style="font-size:14px;font-weight:700;color:var(--red);margin-bottom:4px">Ansiedade alta</div>
+            <div style="font-size:13px;color:var(--text2)">Considera fazer a rotina mínima hoje. É suficiente.</div>
+            <button class="btn-sm" style="background:var(--surface3);border:1.5px solid var(--border);color:var(--text);margin-top:8px" onclick="navigate('minimal');toggleMore()">Ir para dia difícil</button>
+          </div>
+        </div>` : ''}
+      </div>
+
+      <div class="card">
+        <div class="card-title">⚡ Nível de energia</div>
         <div class="slider-group">
-          <div class="slider-label"><span>Energia</span><strong style="color:var(--green)">${m.energy}/10</strong></div>
-          <input type="range" class="range-input" min="0" max="10" value="${m.energy}" oninput="setMentalSlider('energy',this.value)" />
+          <div class="slider-label">
+            <span>Sem força</span>
+            <span class="slider-label-end" id="energy-mental-val">${m.energy}</span>
+            <span>Cheio</span>
+          </div>
+          <input class="range-input" type="range" min="1" max="5" value="${m.energy}"
+            oninput="updateMentalEnergy(+this.value)" />
         </div>
       </div>
 
       <div class="card">
-        <div class="form-group">
-          <label class="form-label">Uma coisa boa que aconteceu hoje</label>
-          <textarea class="form-textarea" id="mental-good" placeholder="Ex: Acordei animado, terminei uma tarefa difícil...">${m.goodThing || ''}</textarea>
-        </div>
-        <div class="form-group">
-          <label class="form-label">O que está te preocupando?</label>
-          <textarea class="form-textarea" id="mental-worry" placeholder="Ex: Prazo no trabalho, conversa difícil...">${m.worry || ''}</textarea>
-        </div>
-        <div class="form-group">
-          <label class="form-label">O que você pode melhorar amanhã?</label>
-          <textarea class="form-textarea" id="mental-improve" placeholder="Ex: Dormir mais cedo, beber mais água...">${m.improvement || ''}</textarea>
-        </div>
-        <button class="btn-primary" onclick="saveMental()">Salvar Diário</button>
+        <div class="card-title">✨ Uma coisa boa do dia</div>
+        <textarea class="form-textarea" id="good-thing" placeholder="Algo positivo que aconteceu ou que você agradece..." oninput="saveMentalFields()">${esc(m.goodThing)}</textarea>
       </div>
 
-      ${reflection ? `
-        <div class="card">
-          <div class="section-label">💬 Reflexão automática</div>
-          <div class="reflection-box">${reflection}</div>
-        </div>
-      ` : ''}
+      <div class="card">
+        <div class="card-title">😔 Uma preocupação</div>
+        <textarea class="form-textarea" id="worry" placeholder="O que está te pesando hoje..." oninput="saveMentalFields()">${esc(m.worry)}</textarea>
+      </div>
+
+      <div class="card">
+        <div class="card-title">🚫 O que me atrapalhou hoje?</div>
+        <textarea class="form-textarea" id="blocker" placeholder="Distrações, imprevistos, falta de energia..." oninput="saveMentalFields()">${esc(m.blocker||'')}</textarea>
+      </div>
+
+      <div class="card">
+        <div class="card-title">🎯 Menor ação que posso fazer agora</div>
+        <textarea class="form-textarea" id="min-action" placeholder="Qual é o menor passo possível agora?" oninput="saveMentalFields()" style="min-height:60px">${esc(m.minAction||'')}</textarea>
+      </div>
+
+      <div class="card">
+        <div class="card-title">🔄 Uma atitude pra amanhã</div>
+        <textarea class="form-textarea" id="improvement" placeholder="O que você pode fazer diferente..." oninput="saveMentalFields()" style="min-height:60px">${esc(m.improvement)}</textarea>
+      </div>
+
+      ${reflection ? `<div class="reflection-box"><div class="reflection-label">💬 Reflexão</div>${reflection}</div>` : ''}
+
+      <button class="btn-primary" style="width:100%;margin-top:4px" onclick="saveMentalAll()">Salvar diário +25 XP</button>
     </div>
-  `;
+  `);
 }
 
-function setMood(mood) {
-  state.mental.mood = mood;
-  saveState();
-  navigate('mental');
+function setMood(emoji) { today().mental.mood = emoji; save(); renderMental(); }
+function updateAnxiety(v) {
+  today().mental.anxiety = v;
+  const el = document.getElementById('anx-val');
+  if (el) el.textContent = v;
+  save();
+}
+function updateMentalEnergy(v) {
+  today().mental.energy = v;
+  const el = document.getElementById('energy-mental-val');
+  if (el) el.textContent = v;
+  save();
+}
+function saveMentalFields() {
+  const m = today().mental;
+  m.goodThing = document.getElementById('good-thing')?.value || '';
+  m.worry = document.getElementById('worry')?.value || '';
+  m.blocker = document.getElementById('blocker')?.value || '';
+  m.minAction = document.getElementById('min-action')?.value || '';
+  m.improvement = document.getElementById('improvement')?.value || '';
+  save();
+}
+function saveMentalAll() {
+  saveMentalFields();
+  addXP(25, 'Diário mental');
+  state.mentalEntries++;
+  showToast('🧠 Diário salvo. Isso importa.', 'success');
+  checkAchievements();
+  renderMental();
 }
 
-function setMentalSlider(key, val) {
-  state.mental[key] = parseInt(val);
-  // Update display inline
-  saveState();
-}
+// ============================================================
+// REPORTS
+// ============================================================
+function renderReports() {
+  const days7 = Array.from({length:7}, (_,i) => offsetDate(i-6));
+  const data = days7.map(d => ({
+    date: d,
+    label: new Date(d + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'short' }),
+    score: state.days[d]?.score || 0,
+    study: +(( state.days[d]?.study?.totalMinutes || 0) / 60).toFixed(1),
+    workout: state.days[d]?.health?.workout === true ? 1 : 0,
+    sleep: state.days[d]?.health?.sleep || 0,
+  }));
 
-function saveMental() {
-  state.mental.goodThing = document.getElementById('mental-good')?.value || '';
-  state.mental.worry = document.getElementById('mental-worry')?.value || '';
-  state.mental.improvement = document.getElementById('mental-improve')?.value || '';
-  state.totalMentalDiaries = (state.totalMentalDiaries || 0) + 1;
-  addXp(25);
-  saveState();
-  navigate('mental');
-  showToast('🧠 Diário salvo! +25 XP', 'success');
-}
+  const avgScore = Math.round(data.reduce((s,d) => s + d.score, 0) / 7);
+  const totalStudy = data.reduce((s,d) => s + d.study, 0).toFixed(1);
+  const workouts = data.filter(d => d.workout).length;
+  const avgSleep = (data.filter(d => d.sleep > 0).reduce((s,d) => s + d.sleep, 0) / Math.max(1, data.filter(d => d.sleep > 0).length)).toFixed(1);
 
-function generateReflection(m) {
-  if (!m.mood && !m.goodThing) return '';
-  const parts = [];
-  if (m.mood === '😢' || m.mood === '😕') parts.push('Dias difíceis fazem parte. O que importa é que você não desistiu de se conhecer.');
-  if (m.mood === '😄' || m.mood === '🙂') parts.push('Que bom que você está bem! Aproveite essa energia para avançar nos seus objetivos.');
-  if (m.anxiety >= 7) parts.push('Sua ansiedade está elevada. Tente respirar fundo 4 vezes antes de dormir — isso ativa o sistema de calma do corpo.');
-  if (m.anxiety <= 3) parts.push('Você está tranquilo hoje. Aproveite esse estado para trabalhar em coisas importantes.');
-  if (m.energy >= 8) parts.push('Alta energia! Dia ideal para atacar aquela tarefa que você tem adiado.');
-  if (m.energy <= 3) parts.push('Energia baixa. Talvez valha priorizar descanso e uma tarefa só. Menos é mais quando estamos no limite.');
-  if (m.goodThing) parts.push(`Você reconheceu algo positivo hoje. Isso treina seu cérebro a encontrar mais coisas boas.`);
-  if (m.improvement) parts.push(`Querer melhorar é o primeiro passo. Amanhã você tem uma nova chance.`);
-  return parts.join(' ');
-}
+  const bestDay = data.reduce((a, b) => a.score >= b.score ? a : b);
+  const worstDay = data.filter(d => d.score > 0).reduce((a, b) => a.score <= b.score ? a : b, { score: 9999, label: '—' });
 
-// ========== REPORTS ==========
-function renderReports(container) {
-  const history = state.history;
-  const days7 = [...Array(7)].map((_, i) => {
-    const d = new Date();
-    d.setDate(d.getDate() - (6 - i));
-    return d.toISOString().slice(0, 10);
-  });
-
-  const scores7 = days7.map(d => history[d] ? history[d].score : 0);
-  const study7 = days7.map(d => history[d] ? (history[d].studyHours || 0) : 0);
-  const labels7 = days7.map(d => { const dt = new Date(d + 'T12:00:00'); return ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'][dt.getDay()]; });
-
-  const avgScore = scores7.reduce((a,b) => a+b, 0) / 7;
-  const totalStudy = study7.reduce((a,b) => a+b, 0);
-  const habitsSorted = [...state.habits].sort((a,b) => (b.streak||0) - (a.streak||0));
+  const topHabit = [...state.habits].sort((a, b) => b.streak - a.streak)[0];
+  const weakHabit = [...state.habits].sort((a, b) => a.streak - b.streak)[0];
 
   const insights = [];
-  if (avgScore >= 70) insights.push({ icon: '🌟', text: `Média de score ${avgScore.toFixed(0)} nos últimos 7 dias. Você está acima da meta de disciplina!` });
-  else insights.push({ icon: '⚠️', text: `Média de score ${avgScore.toFixed(0)}. Tente chegar a 70+ por dia para manter o streak.` });
-  if (totalStudy >= 7) insights.push({ icon: '📚', text: `${totalStudy.toFixed(1)} horas de estudo na semana. Excelente dedicação!` });
-  else insights.push({ icon: '📚', text: `${totalStudy.toFixed(1)} horas de estudo na semana. Tente 1h por dia para construir consistência.` });
-  const topHabit = habitsSorted[0];
-  if (topHabit) insights.push({ icon: '🔥', text: `Seu hábito mais forte é "${topHabit.name}" com ${topHabit.streak} dias de streak.` });
+  const lowSleepDays = data.filter(d => d.sleep > 0 && d.sleep < 6).length;
+  if (lowSleepDays >= 2) insights.push({ icon: '😴', text: 'Sua rotina piora quando o sono fica abaixo de 6h. Priorize dormir mais cedo.' });
+  const workoutDays = data.filter(d => d.workout).length;
+  const workoutScoreAvg = data.filter(d => d.workout).reduce((s,d) => s + d.score, 0) / Math.max(1, workoutDays);
+  const noWorkoutScoreAvg = data.filter(d => !d.workout).reduce((s,d) => s + d.score, 0) / Math.max(1, 7 - workoutDays);
+  if (workoutDays >= 2 && workoutScoreAvg > noWorkoutScoreAvg + 10) insights.push({ icon: '💪', text: 'Você performa melhor nos dias em que treina. Vale priorizar o treino.' });
+  const studyDays = data.filter(d => d.study > 0).length;
+  if (studyDays <= 2) insights.push({ icon: '📚', text: 'Estudo está sendo seu ponto mais fraco essa semana. 25 minutos por dia já muda o jogo.' });
+  if (avgScore >= 75) insights.push({ icon: '🚀', text: 'Semana forte! Você está evoluindo. Não quebra o ritmo agora.' });
+  else if (avgScore < 40) insights.push({ icon: '🔄', text: 'Semana difícil. Simplifica a rotina nos próximos dias e foca no básico.' });
+  if (insights.length === 0) insights.push({ icon: '💡', text: 'Continue registrando sua rotina para ver insights personalizados aqui.' });
 
-  container.innerHTML = `
+  const insightsHTML = insights.map(i => `<div class="insight-item"><span class="insight-icon">${i.icon}</span><span>${i.text}</span></div>`).join('');
+  const rankHTML = [...state.habits].sort((a,b) => b.streak - a.streak).slice(0,5).map(h =>
+    `<div class="rank-item"><span class="rank-name">${h.emoji} ${esc(h.name)}</span><span class="rank-streak">🔥 ${h.streak} dias</span></div>`
+  ).join('');
+
+  setContent(`
     <div class="screen-content">
-      <div class="screen-header">
-        <span style="font-size:26px">📊</span>
-        <h1 class="screen-title">Relatórios</h1>
-      </div>
+      <div class="screen-header"><span class="screen-title">Relatórios</span></div>
 
       <div class="report-stats">
-        <div class="report-stat">
-          <div class="report-stat-value">${avgScore.toFixed(0)}</div>
-          <div class="report-stat-label">Score médio</div>
+        <div class="report-stat"><div class="report-stat-value" style="color:${getScoreColor(avgScore)}">${avgScore}</div><div class="report-stat-label">Média disciplina</div></div>
+        <div class="report-stat"><div class="report-stat-value">${totalStudy}h</div><div class="report-stat-label">Estudado (7d)</div></div>
+        <div class="report-stat"><div class="report-stat-value" style="color:var(--orange)">${state.streak}</div><div class="report-stat-label">Sequência atual</div></div>
+        <div class="report-stat"><div class="report-stat-value" style="color:var(--green)">${workouts}/7</div><div class="report-stat-label">Treinos</div></div>
+      </div>
+
+      <div class="day-highlight">
+        <div class="day-card best">
+          <div class="day-card-label">🏆 Melhor dia</div>
+          <div class="day-card-val text-green">${bestDay.score > 0 ? bestDay.label + ' (' + bestDay.score + ')' : '—'}</div>
         </div>
-        <div class="report-stat">
-          <div class="report-stat-value">${state.streak}</div>
-          <div class="report-stat-label">Streak atual</div>
-        </div>
-        <div class="report-stat">
-          <div class="report-stat-value">${totalStudy.toFixed(1)}h</div>
-          <div class="report-stat-label">Estudo na semana</div>
-        </div>
-        <div class="report-stat">
-          <div class="report-stat-value">${state.achievements.length}</div>
-          <div class="report-stat-label">Conquistas</div>
+        <div class="day-card worst">
+          <div class="day-card-label">🔴 Dia mais fraco</div>
+          <div class="day-card-val text-red">${worstDay.score < 9999 ? worstDay.label + ' (' + worstDay.score + ')' : '—'}</div>
         </div>
       </div>
 
       <div class="card">
-        <div class="section-label">Disciplina — 7 dias</div>
-        <canvas id="chart-score" width="440" height="180"></canvas>
+        <div class="chart-title">📊 Score de disciplina — 7 dias</div>
+        <canvas id="chart-score" height="120"></canvas>
       </div>
 
       <div class="card">
-        <div class="section-label">Horas de estudo — 7 dias</div>
-        <canvas id="chart-study" width="440" height="180"></canvas>
+        <div class="chart-title">📚 Horas de estudo — 7 dias</div>
+        <canvas id="chart-study" height="100"></canvas>
       </div>
 
       <div class="card">
-        <div class="section-label">Ranking de hábitos (streak)</div>
-        ${habitsSorted.slice(0, 5).map((h, i) => `
-          <div class="rank-item">
-            <span style="color:var(--text3);width:20px">${i+1}.</span>
-            <span class="rank-name">${h.emoji} ${h.name}</span>
-            <span class="rank-streak">🔥 ${h.streak} dias</span>
-          </div>
-        `).join('')}
+        <div class="card-title">🧠 Insights da semana</div>
+        ${insightsHTML}
       </div>
 
       <div class="card">
-        <div class="section-label">💡 Insights</div>
-        ${insights.map(ins => `
-          <div class="insight-item">
-            <span class="insight-icon">${ins.icon}</span>
-            <span>${ins.text}</span>
-          </div>
-        `).join('')}
+        <div class="card-title">🔥 Hábitos mais consistentes</div>
+        ${rankHTML || '<p style="color:var(--text3)">Nenhum hábito registrado.</p>'}
+        ${topHabit && weakHabit && topHabit.id !== weakHabit.id ? `
+        <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+          <div style="font-size:13px;color:var(--text2)">Mais forte: <strong>${topHabit.emoji} ${topHabit.name}</strong> (${topHabit.streak} dias)</div>
+          <div style="font-size:13px;color:var(--text2);margin-top:4px">Mais fraco: <strong>${weakHabit.emoji} ${weakHabit.name}</strong> (${weakHabit.streak} dias)</div>
+        </div>` : ''}
       </div>
     </div>
-  `;
+  `);
 
-  // Draw charts
   setTimeout(() => {
-    drawBarChart('chart-score', labels7, scores7, '#4f6ef7', 100);
-    drawBarChart('chart-study', labels7, study7, '#22d47a', Math.max(...study7, 2));
+    drawChart('chart-score', data.map(d => d.label), data.map(d => d.score), '#4f6ef7', 100);
+    drawChart('chart-study', data.map(d => d.label), data.map(d => d.study), '#22d47a', Math.max(...data.map(d => d.study), 2));
   }, 50);
 }
 
-function drawBarChart(canvasId, labels, values, color, maxVal) {
-  const canvas = document.getElementById(canvasId);
+function drawChart(id, labels, values, color, maxVal) {
+  const canvas = document.getElementById(id);
   if (!canvas) return;
-  const ctx = canvas.getContext('2d');
-  const W = canvas.offsetWidth || 440;
-  const H = 180;
+  const W = canvas.parentElement.offsetWidth - 36 || 320;
   canvas.width = W;
-  canvas.height = H;
-  const pad = { top: 16, bottom: 32, left: 10, right: 10 };
-  const barW = (W - pad.left - pad.right) / labels.length - 6;
+  const H = canvas.height;
+  const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, W, H);
-  // BG
-  ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--surface') || '#111122';
-  ctx.fillRect(0, 0, W, H);
-  // Bars
-  labels.forEach((label, i) => {
-    const val = values[i];
-    const x = pad.left + i * ((W - pad.left - pad.right) / labels.length) + 3;
-    const barH = ((val / maxVal) * (H - pad.top - pad.bottom));
-    const y = H - pad.bottom - barH;
-    // Bar
-    ctx.fillStyle = color;
-    ctx.globalAlpha = 0.85;
-    ctx.beginPath();
-    ctx.roundRect ? ctx.roundRect(x, y, barW, barH, [4, 4, 0, 0]) : ctx.rect(x, y, barW, barH);
-    ctx.fill();
-    ctx.globalAlpha = 1;
-    // Value
-    ctx.fillStyle = '#eeeef8';
-    ctx.font = '11px sans-serif';
+  const pad = 28;
+  const barW = Math.max(6, (W - pad * 2) / labels.length - 8);
+  const maxV = maxVal || 1;
+
+  values.forEach((val, i) => {
+    const x = pad + i * ((W - pad * 2) / labels.length) + 4;
+    const barH = Math.max(0, (val / maxV) * (H - 32));
+    const y = H - 22 - barH;
+    const isDark = document.body.classList.contains('dark');
+    ctx.fillStyle = val > 0 ? color : (isDark ? '#252545' : '#e0e0f0');
+    const r = Math.min(6, barW / 2);
+    if (barH > 0) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + barW - r, y);
+      ctx.quadraticCurveTo(x + barW, y, x + barW, y + r);
+      ctx.lineTo(x + barW, y + barH);
+      ctx.lineTo(x, y + barH);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.closePath();
+      ctx.fill();
+    } else {
+      ctx.fillRect(x, H - 22 - 2, barW, 2);
+    }
+    ctx.fillStyle = isDark ? '#555580' : '#9898b8';
+    ctx.font = '10px Inter, sans-serif';
     ctx.textAlign = 'center';
-    if (val > 0) ctx.fillText(Math.round(val * 10) / 10, x + barW / 2, y - 4);
-    // Label
-    ctx.fillStyle = '#9898b8';
-    ctx.font = '11px sans-serif';
-    ctx.fillText(label, x + barW / 2, H - 8);
+    ctx.fillText(labels[i], x + barW / 2, H - 6);
+    if (val > 0) {
+      ctx.fillStyle = isDark ? '#9898b8' : '#5555_80';
+      ctx.fillText(Math.round(val * 10) / 10, x + barW / 2, y - 4);
+    }
   });
 }
 
-// ========== ACHIEVEMENTS ==========
-function renderAchievements(container) {
-  const { level, xpInLevel, xpToNext, xp } = getXpLevel();
-  const topStreak = Math.max(...state.habits.map(h => h.streak || 0), 0);
+// ============================================================
+// ACHIEVEMENTS
+// ============================================================
+function renderAchievements() {
+  const xpNeeded = xpForNextLevel(state.level);
+  const xpPct = Math.round((state.xp / xpNeeded) * 100);
 
-  container.innerHTML = `
+  const badgesHTML = ACHIEVEMENTS.map(a => {
+    const unlocked = state.achievements.includes(a.id);
+    return `<div class="badge-item${unlocked ? ' unlocked' : ' locked'}">
+      <span class="badge-emoji">${unlocked ? a.icon : '🔒'}</span>
+      <div class="badge-name">${a.name}</div>
+      <div class="badge-xp">+${a.xp} XP</div>
+    </div>`;
+  }).join('');
+
+  setContent(`
     <div class="screen-content">
-      <div class="screen-header">
-        <span style="font-size:26px">🏆</span>
-        <h1 class="screen-title">Conquistas</h1>
+      <div class="screen-header"><span class="screen-title">Conquistas</span></div>
+
+      <div class="level-card">
+        <div class="level-top">
+          <div class="level-info">
+            <div class="level-num">${state.level}</div>
+            <div class="level-title">${getLevelTitle(state.level)}</div>
+            <div class="level-xp-label">${state.xp} / ${xpNeeded} XP</div>
+          </div>
+          <div class="level-icon">⭐</div>
+        </div>
+        <div class="xp-bar-wrap"><div class="xp-bar-fill" style="width:${xpPct}%"></div></div>
       </div>
 
-      <div class="card level-card">
-        <div style="display:flex;align-items:center;gap:16px">
-          <div style="text-align:center">
-            <div style="font-size:12px;color:var(--text2)">Nível</div>
-            <div class="level-num">${level}</div>
-          </div>
-          <div style="flex:1">
-            <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--text2);margin-bottom:6px">
-              <span>${xp} XP total</span>
-              <span>${xpInLevel}/${xpToNext} XP</span>
-            </div>
-            <div class="xp-bar-wrap"><div class="xp-bar-fill" style="width:${(xpInLevel/xpToNext)*100}%"></div></div>
-            <div style="font-size:12px;color:var(--text3);margin-top:4px">${xpToNext - xpInLevel} XP para o próximo nível</div>
-          </div>
+      <div class="streak-hero">
+        <div class="streak-num">${state.streak}</div>
+        <div>
+          <div class="streak-info-title">Dias seguidos 🔥</div>
+          <div class="streak-info-sub">Melhor: ${state.bestStreak || state.streak} dias</div>
         </div>
       </div>
 
-      <div class="card" style="background:linear-gradient(135deg,#1a1008,#0d0c05);border-color:var(--orange)">
-        <div style="display:flex;align-items:center;gap:12px">
-          <span style="font-size:36px">🔥</span>
-          <div>
-            <div style="font-size:13px;color:var(--text2)">Maior streak de hábito</div>
-            <div style="font-size:28px;font-weight:900;color:var(--orange)">${topStreak} dias</div>
-          </div>
-          <div style="margin-left:auto;text-align:right">
-            <div style="font-size:13px;color:var(--text2)">Streak atual</div>
-            <div style="font-size:28px;font-weight:900;color:var(--yellow)">${state.streak}</div>
-          </div>
-        </div>
-      </div>
-
-      <div class="badge-grid">
-        ${ACHIEVEMENTS.map(ach => {
-          const unlocked = state.achievements.includes(ach.id);
-          return `
-            <div class="badge-item ${unlocked ? 'unlocked' : 'locked'}">
-              <div class="badge-emoji">${ach.icon}</div>
-              <div class="badge-name">${ach.name}</div>
-              ${unlocked ? `<div style="font-size:10px;color:var(--yellow);margin-top:4px">+${ach.xp} XP</div>` : ''}
-            </div>
-          `;
-        }).join('')}
-      </div>
+      <div class="section-label">Medalhas</div>
+      <div class="badge-grid">${badgesHTML}</div>
     </div>
-  `;
+  `);
 }
 
-// ========== MINIMAL DAY ==========
-const MINIMAL_TASKS = [
-  { icon: '💧', name: 'Beber água' },
-  { icon: '🚿', name: 'Tomar banho' },
-  { icon: '🛏️', name: 'Arrumar a cama' },
-  { icon: '🍽️', name: 'Comer algo' },
-  { icon: '🚶', name: 'Sair para caminhar' },
-  { icon: '📖', name: 'Estudar 15 minutos' },
-  { icon: '🌙', name: 'Dormir cedo' },
-];
+// ============================================================
+// MINIMAL DAY
+// ============================================================
+function renderMinimal() {
+  const day = today();
+  const checked = day.minimalChecked || {};
+  const doneCount = MINIMAL_TASKS.filter(t => checked[t.id]).length;
+  const total = MINIMAL_TASKS.length;
+  const pct = Math.round(doneCount / total * 100);
+  const allDone = doneCount === total;
 
-function renderMinimal(container) {
-  const done = state.minimal.tasks.filter(Boolean).length;
-  const allDone = done === MINIMAL_TASKS.length;
-
-  container.innerHTML = `
-    <div class="screen-content">
-      <div class="screen-header">
-        <span style="font-size:26px">🌱</span>
-        <h1 class="screen-title">Modo Dia Difícil</h1>
-      </div>
-
-      <div class="card" style="background:linear-gradient(135deg,#0d1a0d,#071007);border-color:var(--green)">
-        <p style="font-size:15px;color:var(--text2);line-height:1.6">Nem todo dia você vai estar no seu melhor. E tá tudo bem. Aqui estão 7 tarefas básicas — faça o que puder.</p>
-      </div>
-
-      <div class="card">
-        <div style="display:flex;justify-content:space-between;margin-bottom:10px">
-          <span style="color:var(--text2);font-size:14px">${done}/7 tarefas</span>
-          <span style="color:var(--green);font-weight:700">${Math.round((done/7)*100)}%</span>
-        </div>
-        <div class="progress-bar-wrap">
-          <div class="progress-bar-fill" style="width:${(done/7)*100}%;background:linear-gradient(90deg,var(--green),var(--accent))"></div>
-        </div>
-      </div>
-
-      ${MINIMAL_TASKS.map((t, i) => `
-        <div class="minimal-task ${state.minimal.tasks[i] ? 'done' : ''}" onclick="toggleMinimal(${i})">
-          <span class="minimal-task-icon">${t.icon}</span>
-          <span class="minimal-task-name" style="${state.minimal.tasks[i] ? 'text-decoration:line-through;color:var(--text3)' : ''}">${t.name}</span>
-          <span class="minimal-check">${state.minimal.tasks[i] ? '✅' : '⬜'}</span>
-        </div>
-      `).join('')}
-
-      <div class="celebration ${allDone ? 'show' : ''}">
-        <h2>🎉 Você conseguiu!</h2>
-        <p style="color:var(--text2)">Em um dia difícil, você completou tudo. Isso é força real.</p>
-      </div>
+  const tasksHTML = MINIMAL_TASKS.map(t => `
+    <div class="minimal-task${checked[t.id] ? ' done' : ''}" onclick="toggleMinimal('${t.id}')">
+      <span class="minimal-task-icon">${t.icon}</span>
+      <span class="minimal-task-name">${t.name}</span>
+      <span class="minimal-check">${checked[t.id] ? '✅' : '○'}</span>
     </div>
-  `;
+  `).join('');
+
+  setContent(`
+    <div class="screen-content">
+      <div class="minimal-header">
+        <h1>🌙 Modo Dia Difícil</h1>
+        <p>“Hoje não precisa vencer o mundo.<br>Só não abandona você mesmo.”</p>
+      </div>
+
+      <div class="minimal-progress">
+        <div class="progress-bar-wrap"><div class="progress-bar-fill green" style="width:${pct}%"></div></div>
+        <span class="minimal-progress-label">${doneCount}/${total}</span>
+      </div>
+
+      ${tasksHTML}
+
+      ${allDone ? `
+        <div class="minimal-win">
+          <h2>🏆 Você conseguiu!</h2>
+          <p>Dia difícil também conta quando você não desiste.<br>Isso é mais do que a maioria fez hoje.</p>
+        </div>` : `
+        <div class="card" style="background:linear-gradient(135deg,rgba(168,85,247,0.06),rgba(79,110,247,0.04));border-color:rgba(168,85,247,0.2);text-align:center">
+          <p style="font-size:14px;color:var(--text2);line-height:1.6">“Dia difícil também conta<br>quando você não desiste.”</p>
+        </div>`
+      }
+    </div>
+  `);
 }
 
-function toggleMinimal(idx) {
-  state.minimal.tasks[idx] = !state.minimal.tasks[idx];
-  if (state.minimal.tasks[idx]) { addXp(5); }
-  saveState();
-  navigate('minimal');
-  if (state.minimal.tasks.every(Boolean)) {
-    addXp(50);
-    showToast('🎉 Modo dia difícil completo! +50 XP', 'success');
+function toggleMinimal(id) {
+  const day = today();
+  if (!day.minimalChecked) day.minimalChecked = {};
+  const prev = day.minimalChecked[id];
+  day.minimalChecked[id] = !prev;
+  if (!prev) addXP(8, 'Rotina mínima');
+  const allDone = MINIMAL_TASKS.every(t => day.minimalChecked[t.id]);
+  if (allDone && !day.minimalDone) {
+    day.minimalDone = true;
+    addXP(50, 'Rotina mínima completa!');
+    checkAchievements();
   }
+  save(); renderMinimal();
 }
 
-// ========== WEEKLY ==========
-function renderWeekly(container) {
-  const w = state.weekly;
+// ============================================================
+// WEEKLY
+// ============================================================
+function getWeekKey() {
+  const d = new Date();
+  d.setDate(d.getDate() - d.getDay());
+  return getDateStr(d);
+}
 
-  container.innerHTML = `
+function renderWeekly() {
+  const w = state.weeklyPlan[getWeekKey()] || {};
+  setContent(`
     <div class="screen-content">
-      <div class="screen-header">
-        <span style="font-size:26px">📅</span>
-        <h1 class="screen-title">Planejamento Semanal</h1>
+      <div class="screen-header"><span class="screen-title">Planejamento Semanal</span></div>
+
+      <div class="card">
+        <div class="weekly-question">🎯 Qual é o foco principal dessa semana?</div>
+        <div class="weekly-hint">Uma coisa. Se tudo é prioridade, nada é.</div>
+        <textarea class="form-textarea" id="w-focus" placeholder="Ex: Passar na prova, finalizar projeto...">${esc(w.focus||'')}</textarea>
       </div>
 
       <div class="card">
-        <p style="font-size:14px;color:var(--text2);margin-bottom:16px">Reserve 5 minutos para definir a semana. Quem planeja, performa.</p>
-
-        <div class="week-section">
-          <div class="week-label">🎯 Foco principal da semana</div>
-          <div class="week-sub">O que é mais importante alcançar?</div>
-          <textarea class="form-textarea" id="w-focus" placeholder="Ex: Terminar o projeto X, estudar para a prova...">${w.focus || ''}</textarea>
-        </div>
-
-        <div class="week-section">
-          <div class="week-label">🚧 Possíveis bloqueios</div>
-          <div class="week-sub">O que pode atrapalhar?</div>
-          <textarea class="form-textarea" id="w-blockers" placeholder="Ex: Reuniões demais, distração com redes sociais...">${w.blockers || ''}</textarea>
-        </div>
-
-        <div class="week-section">
-          <div class="week-label">💪 Hábito para fortalecer</div>
-          <div class="week-sub">Qual hábito você vai priorizar esta semana?</div>
-          <textarea class="form-textarea" id="w-habit" placeholder="Ex: Dormir antes de meia-noite todo dia...">${w.habitToStrengthen || ''}</textarea>
-        </div>
-
-        <div class="week-section">
-          <div class="week-label">📌 Metas da semana</div>
-          <div class="week-sub">Liste 3 metas concretas</div>
-          <textarea class="form-textarea" id="w-goals" placeholder="1. ...
-2. ...
-3. ..." style="min-height:100px">${w.goals || ''}</textarea>
-        </div>
-
-        <div class="week-section">
-          <div class="week-label">🚫 O que evitar</div>
-          <div class="week-sub">Comportamentos ou hábitos que você quer reduzir</div>
-          <textarea class="form-textarea" id="w-avoid" placeholder="Ex: Passar mais de 1h no TikTok, comer fora todo dia...">${w.toAvoid || ''}</textarea>
-        </div>
-
-        <button class="btn-primary" onclick="saveWeekly()">💾 Salvar Planejamento</button>
+        <div class="weekly-question">⚠️ O que mais pode te atrapalhar?</div>
+        <div class="weekly-hint">Identificar blockers é metade da batalha.</div>
+        <textarea class="form-textarea" id="w-block" placeholder="Ex: Procrastinação, redes sociais, compromissos...">${esc(w.block||'')}</textarea>
       </div>
+
+      <div class="card">
+        <div class="weekly-question">🔥 Qual hábito você quer fortalecer?</div>
+        <textarea class="form-textarea" id="w-habit" placeholder="Ex: Acordar às 6h, estudar todo dia...">${esc(w.habit||'')}</textarea>
+      </div>
+
+      <div class="card">
+        <div class="weekly-question">📝 Metas da semana</div>
+        <textarea class="form-textarea" id="w-goals" placeholder="Liste suas metas para essa semana...">${esc(w.goals||'')}</textarea>
+      </div>
+
+      <div class="card">
+        <div class="weekly-question">🚫 Coisas a evitar</div>
+        <textarea class="form-textarea" id="w-avoid" placeholder="Ex: Ficar até tarde, compras por impulso...">${esc(w.avoid||'')}</textarea>
+      </div>
+
+      <button class="btn-primary" style="width:100%" onclick="saveWeekly()">💾 Salvar planejamento +30 XP</button>
     </div>
-  `;
+  `);
 }
 
 function saveWeekly() {
-  state.weekly = {
+  const key = getWeekKey();
+  state.weeklyPlan[key] = {
     focus: document.getElementById('w-focus')?.value || '',
-    blockers: document.getElementById('w-blockers')?.value || '',
-    habitToStrengthen: document.getElementById('w-habit')?.value || '',
+    block: document.getElementById('w-block')?.value || '',
+    habit: document.getElementById('w-habit')?.value || '',
     goals: document.getElementById('w-goals')?.value || '',
-    toAvoid: document.getElementById('w-avoid')?.value || '',
+    avoid: document.getElementById('w-avoid')?.value || '',
   };
-  addXp(30);
-  saveState();
-  checkAchievements();
-  showToast('📅 Planejamento salvo! +30 XP', 'success');
+  addXP(30, 'Planejamento semanal');
+  showToast('📅 Semana planejada!', 'success');
+  save();
 }
 
-// ========== SETTINGS ==========
-function renderSettings(container) {
-  const isDark = state.theme === 'dark';
+// ============================================================
+// SETTINGS
+// ============================================================
+function renderSettings() {
+  const isDark = document.body.classList.contains('dark');
+  const totalStudyH = +(Object.values(state.days).reduce((s,d) => s + (d.study?.totalMinutes || 0), 0) / 60).toFixed(1);
+  const totalWorkouts = Object.values(state.days).filter(d => d.health?.workout === true).length;
 
-  container.innerHTML = `
+  setContent(`
     <div class="screen-content">
-      <div class="screen-header">
-        <span style="font-size:26px">⚙️</span>
-        <h1 class="screen-title">Configurações</h1>
-      </div>
+      <div class="screen-header"><span class="screen-title">Configurações</span></div>
 
       <div class="settings-section">
         <div class="settings-section-title">Perfil</div>
         <div class="card">
           <div class="form-group">
             <label class="form-label">Seu nome</label>
-            <input class="form-input" id="settings-name" value="${state.profile.name || ''}" placeholder="Seu nome" />
+            <input class="form-input" id="settings-name" value="${esc(state.settings?.name || state.profile?.name || '')}" placeholder="Seu nome" />
           </div>
-          <button class="btn-primary" onclick="saveName()">Salvar nome</button>
-        </div>
-      </div>
-
-      <div class="settings-section">
-        <div class="settings-section-title">Aparência</div>
-        <div class="card">
-          <div class="toggle-row">
-            <span class="toggle-label">${isDark ? '🌙 Tema escuro' : '☀️ Tema claro'}</span>
-            <div class="toggle ${isDark ? 'on' : ''}" onclick="toggleTheme()"></div>
-          </div>
+          <button class="btn-primary" style="width:100%" onclick="saveName()">Salvar nome</button>
         </div>
       </div>
 
       <div class="settings-section">
         <div class="settings-section-title">Estatísticas</div>
+        <div class="stats-overview">
+          <div class="stats-ov-item"><div class="stats-ov-val" style="color:var(--yellow)">${state.level}</div><div class="stats-ov-label">Nível</div></div>
+          <div class="stats-ov-item"><div class="stats-ov-val" style="color:var(--orange)">${state.streak}</div><div class="stats-ov-label">Streak</div></div>
+          <div class="stats-ov-item"><div class="stats-ov-val">${state.achievements.length}</div><div class="stats-ov-label">Medalhas</div></div>
+          <div class="stats-ov-item"><div class="stats-ov-val" style="color:var(--green)">${totalStudyH}h</div><div class="stats-ov-label">Estudado</div></div>
+          <div class="stats-ov-item"><div class="stats-ov-val">${totalWorkouts}</div><div class="stats-ov-label">Treinos</div></div>
+          <div class="stats-ov-item"><div class="stats-ov-val">${state.totalTasks}</div><div class="stats-ov-label">Tarefas</div></div>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-section-title">Preferências</div>
         <div class="card">
-          <div class="toggle-row" style="border:none;padding:8px 0">
-            <span style="color:var(--text2);font-size:14px">Total de tarefas feitas</span>
-            <span style="font-weight:700">${state.totalTasksDone || 0}</span>
-          </div>
-          <div class="toggle-row" style="border:none;padding:8px 0">
-            <span style="color:var(--text2);font-size:14px">Total de hábitos marcados</span>
-            <span style="font-weight:700">${state.totalHabitsDone || 0}</span>
-          </div>
-          <div class="toggle-row" style="border:none;padding:8px 0">
-            <span style="color:var(--text2);font-size:14px">Total de pomodoros</span>
-            <span style="font-weight:700">${state.totalPomodoros || 0}</span>
-          </div>
-          <div class="toggle-row" style="border:none;padding:8px 0">
-            <span style="color:var(--text2);font-size:14px">XP total</span>
-            <span style="font-weight:700;color:var(--yellow)">${state.totalXp || 0}</span>
-          </div>
-          <div class="toggle-row" style="border:none;padding:8px 0">
-            <span style="color:var(--text2);font-size:14px">Streak atual</span>
-            <span style="font-weight:700;color:var(--orange)">🔥 ${state.streak}</span>
+          <div class="toggle-row">
+            <span class="toggle-label">🌙 Tema escuro</span>
+            <button class="toggle${isDark ? ' on' : ''}" onclick="toggleTheme()" id="theme-toggle"></button>
           </div>
         </div>
       </div>
 
       <div class="settings-section">
-        <div class="settings-section-title" style="color:var(--red)">Zona de perigo</div>
-        <div class="card" style="border-color:var(--red)">
-          <p style="font-size:13px;color:var(--text2);margin-bottom:14px">Isso vai apagar todos os seus dados permanentemente.</p>
-          <button class="danger-btn" onclick="confirmReset()">🗑️ Resetar tudo</button>
+        <div class="settings-section-title">⚠️ Zona de perigo</div>
+        <div class="card">
+          <p style="font-size:14px;color:var(--text2);margin-bottom:14px">Apaga todos os dados. Não tem como desfazer.</p>
+          <button class="danger-btn" onclick="resetAll()">Resetar todos os dados</button>
         </div>
       </div>
     </div>
-  `;
+  `);
 }
 
 function saveName() {
-  const name = document.getElementById('settings-name')?.value.trim();
-  if (!name) { showToast('Digite um nome válido', 'error'); return; }
-  state.profile.name = name;
-  saveState();
+  const v = document.getElementById('settings-name')?.value?.trim();
+  if (!v) return;
+  if (!state.settings) state.settings = {};
+  state.settings.name = v;
+  if (state.profile) state.profile.name = v;
+  save();
   showToast('Nome salvo!', 'success');
 }
 
-function confirmReset() {
-  if (confirm('Tem certeza? Todos os dados serão apagados.')) {
-    localStorage.removeItem(STORAGE_KEY);
-    location.reload();
-  }
+function toggleTheme() {
+  const isDark = document.body.classList.contains('dark');
+  document.body.classList.toggle('dark', !isDark);
+  document.body.classList.toggle('light', isDark);
+  if (!state.settings) state.settings = {};
+  state.settings.theme = isDark ? 'light' : 'dark';
+  save();
+  renderSettings();
 }
 
-// ========== START ==========
-document.addEventListener('DOMContentLoaded', init);
+function resetAll() {
+  if (!confirm('Apagar TODOS os dados? Isso não tem como desfazer.')) return;
+  localStorage.removeItem(STORAGE_KEY);
+  location.reload();
+}
+
+// ============================================================
+// INIT
+// ============================================================
+function init() {
+  loadState();
+
+  const theme = state.settings?.theme || 'dark';
+  document.body.classList.remove('dark', 'light');
+  document.body.classList.add(theme);
+
+  if (state.profile?.completed) {
+    showApp();
+  } else {
+    document.getElementById('screen-onboarding').classList.add('active');
+    document.getElementById('bottom-nav').style.display = 'none';
+    initOnboarding();
+  }
+
+  const midnight = new Date();
+  midnight.setHours(24, 0, 0, 0);
+  setTimeout(() => location.reload(), midnight - new Date());
+}
+
+init();
